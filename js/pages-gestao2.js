@@ -35,42 +35,78 @@ function nextDistribution() { let d = addDays(today(), 1); for (let i = 0; i < 8
 let prepDate = '', prepDraft = {};
 function tabPreparar() {
   const d = prepDate ? parseISO(prepDate) : nextDistribution(), ds = iso(d);
-  const rows = Object.values(USERS).flatMap(c => (c.subs || []).filter(s => deliversOn(s, d)).map(s => ({ c, s })));
-  const card = ({ c, s }) => {
-    const b = P(s.box), id = `${s.id}-${ds}`, done = prepOf(s.id, ds), sz = (BOX_SIZES[s.box] || []).find(z => z.s === s.size);
-    const items = prepDraft[id] || (done ? done.items.map(x => Object.assign({}, x)) : suggestBox(b, s.size, c));
-    if (!prepDraft[id] && !done) prepDraft[id] = items;
-    const kg = round2(items.reduce((a, i) => a + itemKg({ id: i.id, qty: i.qty }), 0));
-    const whyTxt = w => ({ fav: T('favorito', 'favourite'), old: T('colheita mais antiga', 'older harvest'), season: T('a sair de época', 'leaving season') })[w];
-    return `<article class="panel prep${done ? ' done' : ''}" data-prep="${id}">
-      <div class="row-between"><div class="row-gap"><span class="thumb">${artFor(b)}</span><div><b>${esc(c.name)}</b> <span class="small muted">(${esc(c.username)})</span><br>
-        <span class="small">${esc(L(b.name))}, ${sizeName(s.size)} (${sz ? sz.kg : s.kg} kg) · ${s.deliver === 'home' ? T('entrega em casa', 'home delivery') : esc(s.point || T('ponto de recolha', 'pick-up point'))}</span></div></div>
-        <span class="status ${done ? 'ativa' : 'prog'}">${done ? T('Preparada', 'Prepared') : T('Por preparar', 'To prepare')}</span></div>
-      ${(c.favs || []).length || (c.exclude || []).length ? `<p class="small muted mt-s">${(c.favs || []).length ? `${icon('heart', 14)} ${(c.favs || []).map(x => P(x) ? esc(L(P(x).name)) : '').filter(Boolean).slice(0, 8).join(', ')}` : ''}${(c.exclude || []).length ? ` · ${T('Prefere não receber', 'Rather not get')}: ${(c.exclude || []).map(x => P(x) ? esc(L(P(x).name)) : '').filter(Boolean).join(', ')}` : ''}</p>` : ''}
-      <ul class="prep-items">${items.map((i, k) => { const p = P(i.id); if (!p) return ''; const low = tracksStock(p) && stockOf(p) < i.qty && !done;
-        return `<li><span class="thumb sm">${artFor(p)}</span><select data-prep-prod="${id}|${k}" aria-label="${T('Produto', 'Product')}">${PRODUCTS.filter(x => x.cat !== 'caixas' && (available(x) || x.id === i.id)).sort((a, b2) => L(a.name).localeCompare(L(b2.name))).map(x => `<option value="${x.id}"${x.id === i.id ? ' selected' : ''}>${esc(L(x.name))}</option>`).join('')}</select>
-          <input class="num" type="number" min="0.5" step="${byKg(p) ? 0.5 : 1}" value="${i.qty}" data-prep-qty="${id}|${k}" aria-label="${T('Quantidade', 'Quantity')}"> <span class="small">${byKg(p) ? 'kg' : unitWord(p.unit, i.qty)}</span>
-          ${(i.why || []).map(w => `<span class="tag">${whyTxt(w)}</span>`).join('')}${low ? `<span class="tag warn">${T('stock', 'stock')}: ${stockText(p, stockOf(p))}</span>` : ''}
-          ${done ? '' : `<button type="button" class="icon-btn" data-prep-rm="${id}|${k}" aria-label="${T('Tirar', 'Remove')}">${icon('close', 16)}</button>`}</li>`; }).join('')}</ul>
+  const subs = Object.values(USERS).flatMap(c => (c.subs || []).filter(s => deliversOn(s, d)).map(s => ({ c, s })));
+  const orders = ORDERS.filter(o => o.slot === ds && o.status !== 'cancelada').sort((a, b) => a.num.localeCompare(b.num));
+  const whyTxt = w => ({ fav: T('favorito', 'favourite'), old: T('colheita mais antiga', 'older harvest'), season: T('a sair de época', 'leaving season') })[w];
+  const itemsHTML = (id, items, locked) => `<ul class="prep-items">${items.map((i, k) => { const p = P(i.id); if (!p) return ''; const low = tracksStock(p) && stockOf(p) < i.qty && !locked;
+    return locked ? `<li><span class="thumb sm">${artFor(p)}</span>${esc(L(p.name))} <b>${byKg(p) ? numFmt(i.qty) + ' kg' : `${numFmt(i.qty)} ${unitWord(p.unit, i.qty)}`}</b></li>`
+      : `<li><span class="thumb sm">${artFor(p)}</span><select data-prep-prod="${id}|${k}" aria-label="${T('Produto', 'Product')}">${PRODUCTS.filter(x => x.cat !== 'caixas' && (available(x) || x.id === i.id)).sort((a, b2) => L(a.name).localeCompare(L(b2.name))).map(x => `<option value="${x.id}"${x.id === i.id ? ' selected' : ''}>${esc(L(x.name))}</option>`).join('')}</select>
+        <input class="num" type="number" min="0.5" step="${byKg(p) ? 0.5 : 1}" value="${i.qty}" data-prep-qty="${id}|${k}" aria-label="${T('Quantidade', 'Quantity')}"> <span class="small">${byKg(p) ? 'kg' : unitWord(p.unit, i.qty)}</span>
+        ${(i.why || []).map(w => `<span class="tag">${whyTxt(w)}</span>`).join('')}${low ? `<span class="tag warn">${T('stock', 'stock')}: ${stockText(p, stockOf(p))}</span>` : ''}
+        <button type="button" class="icon-btn" data-prep-rm="${id}|${k}" aria-label="${T('Tirar', 'Remove')}">${icon('close', 16)}</button></li>`; }).join('')}</ul>
+    ${locked ? '' : `<button type="button" class="btn btn-line btn-sm" data-prep-add="${id}">${icon('plus', 14)} ${T('Produto', 'Product')}</button>`}`;
+  const draft = (id, box, size, u) => { const done = PREPS.find(p => p.id === id); if (!prepDraft[id]) prepDraft[id] = done ? done.items.map(x => Object.assign({}, x)) : suggestBox(box, size, u); return { done, items: prepDraft[id] }; };
+  const stageTag = st => `<span class="status ${st >= 3 ? 'ativa' : st === 2 ? 'ativa' : 'prog'}">${[T('Por preparar', 'To prepare'), T('Por preparar', 'To prepare'), T('Preparada', 'Packed'), T('Em distribuição', 'Out for delivery'), T('Entregue', 'Delivered')][st] || ''}</span>`;
+  const who = (name, un, extra) => `<div><b>${esc(name)}</b>${un ? ` <span class="small muted">(${esc(un)})</span>` : ''}<br><span class="small">${extra}</span></div>`;
+  /* encomendas da loja: produtos (já escolhidos) e caixas compradas à unidade (conteúdo escolhido aqui) */
+  const orderCard = o => {
+    const st = Math.min(orderStage(o), 4), locked = st >= 2, c = o.user ? USERS[o.user] : null;
+    const boxes = []; o.items.forEach((i, n) => { const p = P(i.id); if (p && p.cat === 'caixas') for (let k = 0; k < (i.qty || 1); k++) boxes.push({ id: `${o.num}-${n}-${k}`, p, size: i.size || (BOX_SIZES[p.id] || [{}])[0].s }); });
+    const prods = o.items.filter(i => P(i.id) && P(i.id).cat !== 'caixas');
+    return `<article class="panel prep${locked ? ' done' : ''}"><div class="row-between">${who(o.name, o.user, `${o.num} · ${o.deliver === 'home' ? T('entrega em casa', 'home delivery') + (o.window ? `, ${o.window}` : '') : esc(o.point || '')}`)}${stageTag(st)}</div>
+      ${prods.length ? `<p class="lbl mt-s">${T('Produtos', 'Products')}</p><ul class="prep-items">${prods.map(i => `<li><span class="thumb sm">${artFor(P(i.id))}</span>${itemText(i)}</li>`).join('')}</ul>` : ''}
+      ${boxes.map(b => { const x = draft(b.id, b.p, b.size, c); return `<p class="lbl mt-s">${esc(L(b.p.name))}, ${sizeName(b.size)}</p>${itemsHTML(b.id, locked ? (x.done ? x.done.items : x.items) : x.items, locked)}`; }).join('')}
+      ${boxPrefs(o)}
+      <div class="row-btns mt-s">${locked ? (st === 2 ? `<button class="btn btn-line btn-sm" data-prep-order-undo="${o.num}">${T('Voltar a abrir', 'Reopen')}</button>` : '')
+        : `<button class="btn btn-green btn-sm" data-prep-order="${o.num}">${icon('check', 16)} ${T('Marcar como preparada', 'Mark as packed')}</button>`}</div></article>`;
+  };
+  /* caixas das subscrições */
+  const subCard = ({ c, s }) => {
+    const b = P(s.box), id = `${s.id}-${ds}`, sz = (BOX_SIZES[s.box] || []).find(z => z.s === s.size), x = draft(id, b, s.size, c), st = x.done ? x.done.stage : 0, locked = !!x.done;
+    const kg = round2((locked ? x.done.items : x.items).reduce((a, i) => a + itemKg({ id: i.id, qty: i.qty }), 0));
+    return `<article class="panel prep${locked ? ' done' : ''}" data-prep="${id}">
+      <div class="row-between"><div class="row-gap"><span class="thumb">${artFor(b)}</span>${who(c.name, c.username, `${esc(L(b.name))}, ${sizeName(s.size)} (${sz ? sz.kg : s.kg} kg) · ${s.deliver === 'home' ? T('entrega em casa', 'home delivery') : esc(s.point || T('ponto de recolha', 'pick-up point'))}`)}</div>${stageTag(st)}</div>
+      ${(c.favs || []).length || (c.exclude || []).length ? `<p class="small muted mt-s">${(c.favs || []).length ? `${icon('heart', 14)} ${(c.favs || []).map(y => P(y) ? esc(L(P(y).name)) : '').filter(Boolean).slice(0, 8).join(', ')}` : ''}${(c.exclude || []).length ? ` · ${T('Prefere não receber', 'Rather not get')}: ${(c.exclude || []).map(y => P(y) ? esc(L(P(y).name)) : '').filter(Boolean).join(', ')}` : ''}</p>` : ''}
+      ${itemsHTML(id, locked ? x.done.items : x.items, locked)}
       <p class="small muted">${T('Peso estimado', 'Estimated weight')}: ${numFmt(kg)} kg ${sz ? `/ ${sz.kg} kg` : ''}</p>
-      <div class="row-btns">${done ? `<button class="btn btn-line btn-sm" data-prep-undo="${id}">${T('Voltar a abrir', 'Reopen')}</button>`
+      <div class="row-btns">${locked ? (st === 2 ? `<button class="btn btn-line btn-sm" data-prep-undo="${id}">${T('Voltar a abrir', 'Reopen')}</button>` : '')
         : `<button class="btn btn-green btn-sm" data-prep-ok="${id}|${s.id}|${c.username}">${icon('check', 16)} ${T('Aceitar e preparar', 'Accept and prepare')}</button>
-           <button class="btn btn-line btn-sm" data-prep-add="${id}">${icon('plus', 14)} ${T('Produto', 'Product')}</button>
            <button class="btn btn-line btn-sm" data-prep-again="${id}|${s.id}|${c.username}">${icon('repeat', 14)} ${T('Nova sugestão', 'New suggestion')}</button>`}</div></article>`;
   };
-  const todo = rows.filter(({ s }) => !prepOf(s.id, ds)).length;
+  const todoSubs = subs.filter(({ s }) => !prepOf(s.id, ds)).length, todoOrd = orders.filter(o => orderStage(o) < 2).length;
+  const ready = orders.filter(o => orderStage(o) === 2).length + PREPS.filter(p => p.date === ds && p.stage === 2).length;
+  const out = orders.filter(o => orderStage(o) === 3).length + PREPS.filter(p => p.date === ds && p.stage === 3).length;
   return `<section class="acc-sec"><h2>${T('Preparar caixas', 'Prepare boxes')}</h2>
-    <p class="muted mt-s">${T('No dia antes de cada distribuição aparecem aqui as caixas das subscrições. A sugestão dá prioridade aos favoritos do cliente, nunca põe o que prefere não receber, usa só produtos com stock e começa pelas colheitas mais antigas e pelos produtos a sair de época. Ao aceitar, as quantidades saem do inventário.', 'The day before each delivery, the subscription boxes show up here. The suggestion favours the customer\'s favourites, never includes what they would rather not get, only uses products in stock and starts with the oldest harvests and products leaving season. Accepting takes the quantities out of the inventory.')}</p>
-    <div class="range-row mt-s"><label class="lbl" for="prep-date">${T('Entrega de', 'Delivery on')}</label><input type="date" id="prep-date" data-prep-date value="${ds}">
-      ${todo > 1 ? `<button class="btn btn-green btn-sm" data-prep-all="${ds}">${icon('check', 16)} ${T(`Aceitar as ${todo} sugestões`, `Accept all ${todo} suggestions`)}</button>` : ''}</div>
-    ${rows.length ? `<p class="small mt-s"><b>${rows.length}</b> ${rows.length === 1 ? T('caixa', 'box') : T('caixas', 'boxes')} · ${todo} ${T('por preparar', 'to prepare')}</p><div class="prep-list">${rows.map(card).join('')}</div>`
-      : `<p class="muted mt">${T(`Não há caixas de subscrição para ${fdate(d, { weekday: 'long', day: 'numeric', month: 'long' })}.`, `No subscription boxes for ${fdate(d, { weekday: 'long', day: 'numeric', month: 'long' })}.`)}</p>`}</section>`;
+    <p class="muted mt-s">${T('Todas as encomendas da loja, as caixas compradas à unidade e as caixas das subscrições passam por aqui antes de seguirem. A sugestão das caixas dá prioridade aos favoritos, nunca põe o que o cliente prefere não receber, usa só produtos com stock e começa pelas colheitas mais antigas. Ao preparar, as quantidades saem do inventário.', 'Every shop order, single box and subscription box goes through here before leaving. Box suggestions favour favourites, never include what the customer would rather not get, only use products in stock and start with the oldest harvests. Packing takes the quantities out of the inventory.')}</p>
+    <div class="range-row mt-s"><label class="lbl" for="prep-date">${T('Distribuição de', 'Delivery run on')}</label><input type="date" id="prep-date" data-prep-date value="${ds}"></div>
+    <div class="kpis prep-kpis"><div><strong>${todoOrd + todoSubs}</strong><span>${T('por preparar', 'to prepare')}</span></div><div><strong>${ready}</strong><span>${T('preparadas', 'packed')}</span></div><div><strong>${out}</strong><span>${T('em distribuição', 'out for delivery')}</span></div></div>
+    <div class="row-btns mt-s">${todoSubs > 1 ? `<button class="btn btn-line btn-sm c-campo" data-prep-all="${ds}">${icon('check', 16)} ${T(`Aceitar as ${todoSubs} sugestões das subscrições`, `Accept all ${todoSubs} subscription suggestions`)}</button>` : ''}
+      ${ready ? `<button class="btn btn-green btn-sm" data-prep-ship="${ds}">${icon('truck', 16)} ${T(`Enviar ${ready} para distribuição`, `Send ${ready} out for delivery`)}</button>` : ''}
+      ${out ? `<button class="btn btn-line btn-sm" data-prep-delivered="${ds}">${icon('check', 16)} ${T(`Marcar ${out} como entregues`, `Mark ${out} as delivered`)}</button>` : ''}</div>
+    <h3 class="mt">${T('Encomendas da loja', 'Shop orders')} <span class="small muted">(${orders.length})</span></h3>
+    ${orders.length ? `<div class="prep-list">${orders.map(orderCard).join('')}</div>` : `<p class="muted small">${T('Sem encomendas para este dia.', 'No orders for this day.')}</p>`}
+    <h3 class="mt">${T('Caixas das subscrições', 'Subscription boxes')} <span class="small muted">(${subs.length})</span></h3>
+    ${subs.length ? `<div class="prep-list">${subs.map(subCard).join('')}</div>` : `<p class="muted small">${T(`Não há caixas de subscrição para ${fdate(d, { weekday: 'long', day: 'numeric', month: 'long' })}.`, `No subscription boxes for ${fdate(d, { weekday: 'long', day: 'numeric', month: 'long' })}.`)}</p>`}</section>`;
 }
-function acceptPrep(id, subId, un) {
+function acceptPrep(id, subId, un, extra) {
   const c = USERS[un], items = (prepDraft[id] || []).filter(i => P(i.id) && i.qty > 0).map(i => ({ id: i.id, qty: +i.qty }));
-  const p = { id, sub: subId, user: c ? (NUVEM.on ? c._id : c.username) : null, date: id.slice(-10), items, at: nowISO() };
+  const s = c && subId ? (c.subs || []).find(x => x.id === subId) : null;
+  const p = Object.assign({ id, sub: subId || null, user: c ? (NUVEM.on ? c._id : c.username) : null, date: id.slice(-10), box: s ? s.box : null, size: s ? s.size : null, items, stage: 2, at: nowISO() }, extra || {});
   try { savePrep(p); delete prepDraft[id]; return true; }
   catch (e) { if (e.stock) toast(T(`Sem stock suficiente de ${L(P(e.stock.product).name)} (restam ${numFmt(e.stock.left)}).`, `Not enough ${L(P(e.stock.product).name)} in stock (${numFmt(e.stock.left)} left).`)); return false; }
+}
+/* encomenda preparada: guarda o conteúdo das caixas compradas à unidade e passa a "Preparada" */
+function prepareOrder(num) {
+  const o = findOrder(num); if (!o) return false;
+  for (const [n, i] of o.items.entries()) { const p = P(i.id); if (!p || p.cat !== 'caixas') continue;
+    for (let k = 0; k < (i.qty || 1); k++) { const id = `${o.num}-${n}-${k}`; if (!prepDraft[id]) prepDraft[id] = suggestBox(p, i.size, o.user ? USERS[o.user] : null);
+      if (!acceptPrep(id, null, o.user, { date: o.slot, order: o.num, box: p.id, size: i.size || null, user: o.user && USERS[o.user] ? (NUVEM.on ? USERS[o.user]._id : o.user) : null })) return false; } }
+  o.stage = 2; saveOrders(); notifyStageLocal(o); return true;
+}
+function setStageForDate(ds, from, to) {
+  ORDERS.filter(o => o.slot === ds && o.status !== 'cancelada' && orderStage(o) === from).forEach(o => { o.stage = to; notifyStageLocal(o); });
+  saveOrders();
+  PREPS.filter(p => p.date === ds && p.stage === from).forEach(p => savePrep(Object.assign({}, p, { stage: to })));
 }
 
 /* ---------- inventário (gestão): stock por produto e todas as entregas ---------- */
@@ -172,6 +208,10 @@ PAGE_EVENTS.click.push((e, t, d) => {
   if (d.prepAll) { const day = parseISO(d.prepAll); let n = 0;
     Object.values(USERS).forEach(c => (c.subs || []).filter(s => deliversOn(s, day) && !prepOf(s.id, d.prepAll)).forEach(s => { const id = `${s.id}-${d.prepAll}`; if (!prepDraft[id]) prepDraft[id] = suggestBox(P(s.box), s.size, c); if (acceptPrep(id, s.id, c.username)) n++; }));
     toast(T(`${n} caixas preparadas`, `${n} boxes prepared`)); rerenderKeep(); return true; }
+  if (d.prepOrder) { if (prepareOrder(d.prepOrder)) toast(T('Encomenda preparada', 'Order packed')); rerenderKeep(); return true; }
+  if (d.prepOrderUndo) { const o = findOrder(d.prepOrderUndo); PREPS.filter(p => p.order === o.num).map(p => p.id).forEach(id => deletePrep(id)); o.stage = 1; saveOrders(); toast(T('A encomenda voltou a "Em preparação" (stock reposto).', 'The order is back to "Being packed" (stock restored).')); rerenderKeep(); return true; }
+  if (d.prepShip) { setStageForDate(d.prepShip, 2, 3); toast(T('Enviadas para distribuição: os clientes foram avisados.', 'Sent out for delivery: customers were notified.')); rerenderKeep(); return true; }
+  if (d.prepDelivered) { setStageForDate(d.prepDelivered, 3, 4); toast(T('Marcadas como entregues', 'Marked as delivered')); rerenderKeep(); return true; }
   if (d.prepUndo) { deletePrep(d.prepUndo); toast(T('A caixa voltou a ficar por preparar (o stock foi reposto).', 'The box is back to "to prepare" (stock restored).')); rerenderKeep(); return true; }
   if (d.admLotDel) { const l = LOTS.find(x => x.id === d.admLotDel); if (l && !(l.sold > 0)) { deleteLot(l.id); toast(T('Entrega apagada', 'Supply deleted')); rerenderKeep(); } return true; }
   if ('promoGen' in d) { const i = $('#pm-code'); if (i) i.value = newPromoCode(); return true; }
@@ -219,4 +259,44 @@ PAGE_EVENTS.submit.push((e, f) => {
       kind: $('#pm-kind').value, value: Math.max(0, +$('#pm-val').value || 0), min: Math.max(0, +$('#pm-min').value || 0), until: $('#pm-until').value, code, public: $('#pm-pub').checked, active: $('#pm-act').checked, created: (promoForm && promoForm.created) || nowISO() };
     if (p.kind === 'percent' && p.value > 90) { err.hidden = false; err.textContent = T('O desconto não pode passar de 90%.', 'The discount cannot be over 90%.'); return true; }
     savePromo(p); promoForm = null; toast(T('Promoção guardada', 'Promotion saved')); rerenderKeep(); return true; }
+});
+
+/* ---------- Encomendas (gestão): caixas das subscrições, com o estado de cada uma ---------- */
+function subBoxesAdmin() {
+  const rows = Object.values(USERS).flatMap(c => subDeliveries(c).map(x => Object.assign({ c }, x))).filter(x => x.stage > 0 || x.date <= iso(addDays(today(), 14))).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 200);
+  return `<h3 class="mt-l">${T('Caixas das subscrições', 'Subscription boxes')} <span class="small muted">(${rows.length})</span></h3>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>${T('Entrega', 'Delivery')}</th><th>${T('Cliente', 'Customer')}</th><th>${T('Caixa', 'Box')}</th><th>${T('Conteúdo', 'Contents')}</th><th>${T('Estado', 'Status')}</th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td>${fdate(parseISO(x.date), { weekday: 'short', day: 'numeric', month: 'short' })}</td><td>${esc(x.c.name)}<br><span class="small muted">${x.s.deliver === 'home' ? T('Casa', 'Home') : esc(x.s.point || '')}</span></td><td>${esc(L(P(x.box).name))}, ${sizeName(x.size)}</td>
+      <td class="small">${x.items.length ? x.items.map(i => P(i.id) ? `${esc(L(P(i.id).name))} ${numFmt(i.qty)}` : '').join(', ') : `<a class="link" href="${href('conta', 'tab=preparar')}">${T('Preparar', 'Prepare')}</a>`}</td>
+      <td>${x.stage >= 2 ? `<select class="sel sm" data-box-stage="${x.id}" aria-label="${T('Estado', 'Status')}">${[2, 3, 4].map(n => `<option value="${n}"${x.stage === n ? ' selected' : ''}>${BOX_STAGES()[n]}</option>`).join('')}</select>` : `<span class="status prog">${BOX_STAGES()[x.stage]}</span>`}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+PAGE_EVENTS.change.push((e, t) => {
+  if (PAGE !== 'conta' || !t.dataset.boxStage || !adminOnly()) return;
+  const p = PREPS.find(x => x.id === t.dataset.boxStage); if (p) { savePrep(Object.assign({}, p, { stage: +t.value })); toast(T('Estado da caixa atualizado', 'Box status updated')); }
+  return true;
+});
+
+/* ---------- catálogo: nome e detalhes de qualquer produto (não só dos novos) ---------- */
+function prodEditModal(id) {
+  const p = P(id); if (!p) return;
+  const v = (o, l) => esc((o && o[l]) || '');
+  openModal(`<div class="mbody"><h2>${T('Nome e detalhes', 'Name and details')}</h2><p class="small muted">${esc(p.id)}</p>
+    <form class="form mt-s" data-prod-edit-form="${p.id}" novalidate>
+      <div class="row"><div class="field"><label for="pe-npt">${T('Nome (português)', 'Name (Portuguese)')}</label><input id="pe-npt" value="${v(p.name, 'pt')}" required></div><div class="field"><label for="pe-nen">${T('Nome (inglês)', 'Name (English)')}</label><input id="pe-nen" value="${v(p.name, 'en')}" required></div></div>
+      <div class="field"><label for="pe-dpt">${T('Descrição (português)', 'Description (Portuguese)')}</label><textarea id="pe-dpt" rows="3">${v(p.desc, 'pt')}</textarea></div>
+      <div class="field"><label for="pe-den">${T('Descrição (inglês)', 'Description (English)')}</label><textarea id="pe-den" rows="3">${v(p.desc, 'en')}</textarea></div>
+      <div class="row"><div class="field"><label for="pe-cat">${T('Categoria', 'Category')}</label><select id="pe-cat">${['fruta', 'legumes'].map(c => `<option value="${c}"${p.cat === c ? ' selected' : ''}>${catName(c)}</option>`).join('')}</select></div>
+        <div class="field"><label for="pe-unit">${T('Vende-se ao/à', 'Sold by')}</label><select id="pe-unit">${[['kg', T('quilo', 'kilo')], ['un', T('unidade', 'unit')], ['molho', T('molho', 'bunch')], ['cuv', T('cuvete', 'punnet')]].map(([x, n]) => `<option value="${x}"${p.unit === x ? ' selected' : ''}>${n}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="pe-al">${T('Outros nomes para a pesquisa (separados por vírgulas)', 'Other names for search (comma separated)')}</label><input id="pe-al" value="${esc((p.aliases || []).join(', '))}"></div>
+      <div class="row-gap"><label class="switch sm"><input type="checkbox" id="pe-ess"${p.essential ? ' checked' : ''}>${T('Essencial (entra na Caixa Essencial)', 'Essential (goes in the Essentials Box)')}</label></div>
+      <p class="err" hidden></p><div class="row-btns mt-s"><button class="btn btn-green" type="submit">${T('Guardar', 'Save')}</button><button type="button" class="btn btn-line c-campo" data-modal-close>${T('Cancelar', 'Cancel')}</button></div></form></div>`, T('Editar produto', 'Edit product'));
+}
+PAGE_EVENTS.click.push((e, t, d) => { if (d.prodEdit && adminOnly()) { prodEditModal(d.prodEdit); return true; } });
+PAGE_EVENTS.submit.push((e, f) => {
+  if (!f.matches('[data-prod-edit-form]') || !adminOnly()) return; e.preventDefault(); if (!validate(f)) return true;
+  const id = f.dataset.prodEditForm, o = { name: { pt: $('#pe-npt').value.trim(), en: $('#pe-nen').value.trim() }, desc: { pt: $('#pe-dpt').value.trim(), en: $('#pe-den').value.trim() || $('#pe-dpt').value.trim() },
+    cat: $('#pe-cat').value, unit: $('#pe-unit').value, essential: $('#pe-ess').checked, aliases: $('#pe-al').value.split(',').map(x => x.trim()).filter(Boolean) };
+  saveCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, o); });
+  closeModal(); toast(T('Produto atualizado', 'Product updated')); rerenderKeep(); return true;
 });

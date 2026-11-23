@@ -81,6 +81,7 @@ No menu da esquerda, **SQL Editor** → *New query*. Para cada ficheiro da pasta
 | `supabase/07-colhe-e-produtos.sql` | Versão 9: vários dias Colhe Connosco na mesma data (cada dia tem um id), avaliação só uma vez, registo da colheita com valor pago, "Deixar de vender" e fotografias de produtos novos. Corra-o **antes** de enviar a versão 9 do site, depois do 06. Depois do 07, não volte a correr o 06. |
 | `supabase/08-avaliacoes-e-caixas.sql` | Versão 10: respostas da gestão aos comentários do Colhe Connosco, lista pública das avaliações dos dias passados e tabela `caixas` (caixas novas criadas na gestão). Corra-o **antes** de enviar a versão 10 do site, depois do 07. |
 | `supabase/09-loja-e-inventario.sql` | Versão 11: inventário (entregas dos agricultores em lotes, stock confirmado em cada encomenda), Saldo Daqui, Cooperativa, promoções e códigos, notificações do sininho, avaliações de produtos, caixas preparadas e definições da gestão (portes). Corra-o **antes** de enviar a versão 11 do site, depois do 08. |
+| `supabase/10-encomendas-e-avisos.sql` | Versão 12: novos estados das encomendas (Preparada, Em distribuição), todas as encomendas e caixas passam por "Preparar caixas", avisos à gestão (entregas, encomendas, avaliações e caixas a preparar 48 h antes), avaliações editáveis pelo autor, posição dos restaurantes no mapa e notas de pagamento dos agricultores. Corra-o **antes** de enviar a versão 12 do site, depois do 09. |
 | `supabase/05-notificacoes.sql` | Só para as notificações da app Android, **depois** de criar a função `notificar` (ver `LEIA-ME-APP.md` do projeto `daqui-android`). Antes de correr, troque as 2 linhas marcadas com `<<<`. |
 
 Para confirmar: **Table Editor** → tabela `perfis` deve ter 27 linhas e `produtos` 94.
@@ -235,7 +236,7 @@ js/                         ver tabela abaixo
 ferramentas/                scripts para gerar páginas, ícones, análises e o SQL da base de dados
 app/index.html              a app para telemóvel (secção 23); app/manifest.webmanifest, app/sw.js, app/icones/
 css/app.css                 estilos só da app (tudo começa por body.app)
-supabase/                   01-estrutura.sql … 09-loja-e-inventario.sql (secção 2)
+supabase/                   01-estrutura.sql … 10-encomendas-e-avisos.sql (secção 2)
 supabase/funcoes/notificar/index.ts   função do Supabase que envia as notificações (Firebase)
 LEIA-ME.md                  este ficheiro
 ```
@@ -654,3 +655,21 @@ App Android: `npm install` (plugins novos: Filesystem e Share, para as faturas e
 | Textos | Termos, Privacidade, Cookies e Devoluções em páginas próprias; mais perguntas frequentes. |
 
 Ficheiros novos: `js/dados.js`, `js/pages-gestao2.js`, `js/pages-extra.js`, `js/faturas.js`, `js/textos.js`, páginas `restaurante/`, `cooperativa/`, `termos/`, `privacidade/`, `cookies/`, `devolucoes/`.
+
+## 29. Versão 12: o que mudou
+
+Base de dados: corra `supabase/10-encomendas-e-avisos.sql` (depois do 09; pode repetir). A função `notificar` não muda.
+
+- **Telemóvel:** nenhum ecrã desliza para o lado (testado a 360 px e 390 px em todos os ecrãs de cliente, gestão, agricultor e restaurante); a janela "Carregar saldo" fica presa; espaçamentos com uma só escala (4, 8, 12, 16 e 24 px).
+- **Cooperativa:** entrada própria no menu do site, destaque no início (site e app), aviso "membros não pagam portes" no cabaz e na finalização, cartão na conta da app e uma estrela ★ junto ao nome de quem é membro.
+- **Agricultor (app):** 4 separadores (Produtos, Entregas, Colhe, Conta). Propostas, Vendas e pagamentos e Perfil da quinta estão em Conta. O perfil da quinta só muda depois de carregar em "Editar" e o pin só mexe depois de "Mudar a posição".
+- **Notas de pagamento:** o agricultor vê o que vendeu (preço do site × a sua percentagem) e descarrega a nota de pagamento de cada mês em PDF.
+- **Estados das encomendas:** Recebida, Em preparação, Preparada, Em distribuição (ou Pronta no ponto), Entregue (ou Levantada). O cliente recebe um aviso em cada mudança.
+- **Preparar caixas:** encomendas de produtos, caixas à unidade e caixas das subscrições passam todas por aqui. Botões "Marcar como preparada", "Enviar para distribuição" e "Marcar como entregues".
+- **Caixas das subscrições** aparecem nas encomendas do cliente e da gestão. O conteúdo só aparece ao cliente depois de entregue.
+- **Avisos à gestão** (sininho e push): entrega nova de um agricultor, encomenda nova, avaliação nova e, todos os dias às 9h, quantas caixas há para preparar na distribuição de daqui a 2 dias (precisa do pg_cron, já ligado na secção 5).
+- **Catálogo:** o lápis ao lado de cada produto abre a edição do nome, descrição, categoria, unidade e nomes alternativos de qualquer produto.
+- **Avaliações:** corrigido o erro em que 5 estrelas ficavam 1 na app. Cada pessoa edita ou apaga as suas avaliações em Conta > Avaliações.
+- **Restaurantes:** a vinheta inteira abre a página do restaurante; cada restaurante muda a posição do seu pin no mapa (só dentro de Aveiro).
+- **Gravações mais seguras:** uma alteração feita enquanto os dados estão a ser relidos já não se perde.
+

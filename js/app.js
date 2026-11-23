@@ -243,15 +243,17 @@ function toggleFav(id) {
 }
 /* dias de entrega e estado das encomendas */
 const slotLabel = sl => `${fdate(sl.date || sl, { weekday: 'long' })}, ${fdate(sl.date || sl, { day: 'numeric', month: 'long' })}`;
-const STAGES = () => [T('Recebida', 'Received'), T('Em preparação', 'Being packed'), T('Em distribuição', 'Out for delivery'), T('Entregue', 'Delivered')];
-const STAGES_PICK = () => [T('Recebida', 'Received'), T('Em preparação', 'Being packed'), T('Pronta para levantar', 'Ready to collect'), T('Levantada', 'Collected')];
-function stageName(o) { const s = orderStage(o); return s === 4 ? T('Cancelada', 'Cancelled') : (o.deliver === 'home' ? STAGES() : STAGES_PICK())[s]; }
+const STAGES = () => [T('Recebida', 'Received'), T('Em preparação', 'Being packed'), T('Preparada', 'Packed'), T('Em distribuição', 'Out for delivery'), T('Entregue', 'Delivered')];
+const STAGES_PICK = () => [T('Recebida', 'Received'), T('Em preparação', 'Being packed'), T('Preparada', 'Packed'), T('Em distribuição', 'Out for delivery'), T('Levantada', 'Collected')];
+const STAGE_DONE = 4, STAGE_CANCEL = 5;
+const stageCls = st => (st === STAGE_CANCEL ? 'pausada' : st >= 3 ? 'ativa' : 'prog');
+function stageName(o) { const s = orderStage(o); return s === STAGE_CANCEL ? T('Cancelada', 'Cancelled') : (o.deliver === 'home' ? STAGES() : STAGES_PICK())[s]; }
 function trackHTML(o) {
   const st = orderStage(o), names = o.deliver === 'home' ? STAGES() : STAGES_PICK();
   const when = o.deliver === 'home' ? `${slotLabel(o.slot)}, ${o.window}` : `${slotLabel(o.slot)}, ${DISTRIBUTION.days[o.day]?.pickup || ''}, ${o.point}`;
   return `<div class="track">
-    <div class="row-between"><h3>${T('Encomenda', 'Order')} ${o.num}</h3><span class="status ${st === 4 ? 'pausada' : 'ativa'}">${stageName(o)}</span></div>
-    ${st === 4 ? `<p class="muted">${T('Esta encomenda foi cancelada.', 'This order was cancelled.')}</p>` : `<ol class="steps-track">${names.map((n, i) => `<li class="${i < st || st === 3 ? 'done' : i === st ? 'now' : ''}"><span class="dot">${i < st || st === 3 ? icon('check', 14) : ''}</span>${n}</li>`).join('')}</ol>`}
+    <div class="row-between"><h3>${T('Encomenda', 'Order')} ${o.num}</h3><span class="status ${stageCls(st)}">${stageName(o)}</span></div>
+    ${st === STAGE_CANCEL ? `<p class="muted">${T('Esta encomenda foi cancelada.', 'This order was cancelled.')}</p>` : `<ol class="steps-track">${names.map((n, i) => `<li class="${i < st || st === STAGE_DONE ? 'done' : i === st ? 'now' : ''}"><span class="dot">${i < st || st === STAGE_DONE ? icon('check', 14) : ''}</span>${n}</li>`).join('')}</ol>`}
     <dl class="dl cols2">
       <div><dt>${o.deliver === 'home' ? T('Entrega', 'Delivery') : T('Levantamento', 'Pick-up')}</dt><dd>${esc(when)}</dd></div>
       ${o.deliver === 'home' ? `<div><dt>${T('Morada', 'Address')}</dt><dd>${esc(o.address)}</dd></div>` : ''}
@@ -358,7 +360,7 @@ function reqValue(k, v) {
 const NAV = () => [
   ['', T('Início', 'Home'), 'inicio'], ['produtos', T('Produtos', 'Shop'), 'produtos'], ['subscricao', T('Subscrição', 'Subscription'), 'subscricao'],
   ['agricultores', T('Os nossos agricultores', 'Our farmers'), 'agricultores'], ['restaurantes', T('Restaurantes', 'Restaurants'), 'restaurantes'],
-  ['colhe-connosco', T('Colhe Connosco', 'Join the Harvest'), 'colhe-connosco'], ['sobre', T('Sobre nós', 'About us'), 'sobre'], ['contacto', T('Contacto', 'Contact'), 'contacto']
+  ['colhe-connosco', T('Colhe Connosco', 'Join the Harvest'), 'colhe-connosco'], ['cooperativa', T('Cooperativa', 'Co-op'), 'cooperativa'], ['sobre', T('Sobre nós', 'About us'), 'sobre'], ['contacto', T('Contacto', 'Contact'), 'contacto']
 ];
 const SECTION = { produto: 'produtos', agricultor: 'agricultores', subscrever: 'subscricao' }[PAGE] || PAGE;
 function langToggle() { return `<div class="lang" role="group" aria-label="${T('Idioma', 'Language')}"><button data-lang="pt" aria-pressed="${lang === 'pt'}" lang="pt">PT</button><button data-lang="en" aria-pressed="${lang === 'en'}" lang="en">EN</button></div>`; }
@@ -386,7 +388,7 @@ function header() {
         <a class="hdr-help" href="${href('contacto')}"><span>${T('Ajuda? Ligue-nos', 'Help? Call us')}</span><strong>${PHONE}</strong></a>
         ${langToggle()}
         ${typeof bellButton === 'function' ? bellButton() : ''}
-        <a class="acct-link" href="${href(!u ? 'entrar' : u.partner ? 'parceiro' : 'conta')}" aria-label="${u ? T('A minha conta', 'My account') : T('Entrar', 'Sign in')}${newReq ? `, ${newReq} ${T('pedidos novos', 'new requests')}` : ''}">${icon('user', 24)}<span>${u ? esc(u.name.split(' ')[0]) : T('Entrar', 'Sign in')}</span>${newReq ? `<span class="count">${newReq}</span>` : ''}</a>
+        <a class="acct-link" href="${href(!u ? 'entrar' : u.partner ? 'parceiro' : 'conta')}" aria-label="${u ? T('A minha conta', 'My account') : T('Entrar', 'Sign in')}${newReq ? `, ${newReq} ${T('pedidos novos', 'new requests')}` : ''}">${icon('user', 24)}<span>${u ? esc(u.name.split(' ')[0]) : T('Entrar', 'Sign in')}${u && typeof memberStar === 'function' ? memberStar(u) : ''}</span>${newReq ? `<span class="count">${newReq}</span>` : ''}</a>
         <button class="icon-btn" data-cart-open aria-label="${T('Abrir cabaz', 'Open basket')}, ${count} ${T('artigos', 'items')}">${icon('basket', 26)}${count ? `<span class="count">${count}</span>` : ''}</button>
       </div>
     </div>
@@ -447,6 +449,7 @@ function drawerHTML() {
     ${cart.length ? items : `<div class="empty"><h3>${T('O seu cabaz está vazio', 'Your basket is empty')}</h3><p class="muted">${T('Comece pelos essenciais da semana.', 'Start with this week\'s essentials.')}</p><a class="btn btn-green" href="${href('produtos')}">${T('Ver produtos', 'Browse the shop')}</a></div>`}
     ${cart.length ? `<fieldset class="plain"><legend class="lbl">${T('Como quer receber?', 'How would you like it?')}</legend>
       <div class="radios"><label><input type="radio" name="deliver" value="pickup"${deliver === 'pickup' ? ' checked' : ''}>${T('Ponto de recolha', 'Pick-up point')} (+${feeText('pickup')})</label><label><input type="radio" name="deliver" value="home"${deliver === 'home' ? ' checked' : ''}>${T('Entrega em casa', 'Home delivery')} (+${feeText('home')})</label></div>
+      ${typeof coopUpsell === 'function' ? coopUpsell(t.del) : ''}
       <p class="small muted">${t.sub < SETTINGS.freeFrom ? T(`Faltam ${money(SETTINGS.freeFrom - t.sub)} para os portes grátis.`, `${money(SETTINGS.freeFrom - t.sub)} more for free delivery.`) : T('Portes grátis nesta encomenda.', 'Free delivery on this order.')}</p></fieldset>
       <p class="note small">${icon('clock', 20)}<span>${T(`Distribuímos à quinta-feira e ao sábado. Se encomendar agora: ${slotLabel(slotOptions()[0])}.`, `We deliver on Thursdays and Saturdays. Order now for ${slotLabel(slotOptions()[0])}.`)}</span></p>` : ''}
   </div>

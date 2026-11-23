@@ -68,9 +68,9 @@ function restFilters() {
 }
 function restListHTML(list) {
   return `<ol class="rest-list">${list.map((r, i) => { return `<li id="${r.id}" class="rest" data-rest-card="${r.id}"><span class="rn">${i + 1}</span><div>
-    <h3><a href="${restHref(r)}">${esc(r.name)}</a></h3><p class="small muted">${esc(cuisineName(r))}. ${esc(L(r.area))}${restPos ? ` · <b class="c-campo">${kmText(kmTo(restPos, r))}</b>` : ''}</p>
+    <h3><a class="stretch" href="${restHref(r)}">${esc(r.name)}</a></h3><p class="small muted">${esc(cuisineName(r))}. ${esc(L(r.area))}${restPos ? ` · <b class="c-campo">${kmText(kmTo(restPos, r))}</b>` : ''}</p>
     <p class="small"><b>${T('Prato da semana', 'Dish of the week')}:</b> ${esc(L(r.dish))} ${vegBadges({ veg: r.dishVeg, vegan: r.dishVegan }, true)}</p>
-    <p class="small muted">${T('Selo desde', 'Seal since')} ${r.since ? fdate(parseISO(r.since + '-15'), { month: 'long', year: 'numeric' }) : '–'} · <a class="link" href="${restHref(r)}">${T('Ver o restaurante', 'See the restaurant')}</a></p></div></li>`; }).join('')}</ol>`;
+    <p class="small muted">${T('Selo desde', 'Seal since')} ${r.since ? fdate(parseISO(r.since + '-15'), { month: 'long', year: 'numeric' }) : '–'} · <span class="link">${T('Ver o restaurante', 'See the restaurant')}</span></p></div></li>`; }).join('')}</ol>`;
 }
 PAGE_EVENTS.click.push((e, t, d) => {
   if (d.restCuisine) { restCuisine = d.restCuisine; rerenderKeep(`[data-rest-cuisine="${d.restCuisine}"]`); return true; }
@@ -107,6 +107,7 @@ PAGES.restaurante = () => {
 /* ---------- mapa de Aveiro: arrastar, aproximar e afastar dentro do quadro (rato, dedo e botões) ---------- */
 function enhanceMaps(root = document) {
   root.querySelectorAll('svg.avmap:not([data-pz])').forEach(svg => {
+    if (svg.closest('[data-no-pz]')) { svg.dataset.pz = '0'; return; }
     svg.dataset.pz = '1';
     const box = svg.parentElement; box.classList.add('pz-box');
     const W = 640, H = 548; let vb = { x: 0, y: 0, w: W, h: H };
@@ -168,7 +169,16 @@ function bellButton() {
   const n = unreadNotifs(u);
   return `<button class="icon-btn bell" data-bell aria-label="${T('Notificações', 'Notifications')}${n ? `, ${n} ${T('por ler', 'unread')}` : ''}" aria-expanded="false">${icon('bell', 22)}${n ? `<span class="count">${n > 9 ? '9+' : n}</span>` : ''}</button>`;
 }
-function notifRoute(n) { const r = String(n.route || '').replace(/^\//, ''); if (!r || r === 'notificacoes') return ''; if (/^produto\//.test(r)) return href('produtos/' + r.split('/')[1]); if (/^(encomenda|encomendas)/.test(r)) return href('conta', 'sec=encomendas'); return href(r.split('?')[0], r.split('?')[1] || ''); }
+function notifRoute(n) {
+  const r = String(n.route || '').replace(/^#?\//, ''), [a, b] = r.split('?')[0].split('/');
+  if (!r || r === 'notificacoes') return '';
+  if (a === 'produto') return href('produtos/' + b);
+  if (a === 'g') return href('conta', 'tab=' + b);
+  if (a === 'conta' && b) return href('conta', 'sec=' + b);
+  if (a === 'encomenda') return PAGE_DOC === 'app' ? '#/encomenda/' + b : href('conta', 'sec=encomendas');
+  if (a === 'encomendas') return href('conta', 'sec=encomendas');
+  return href(r.split('?')[0], r.split('?')[1] || '');
+}
 function promoCard(p, u, big) {
   const c = claimOf(u, p.id), ok = promoValid(p);
   return `<div class="promo-card${big ? ' big' : ''}${c ? ' claimed' : ''}"><span class="pc-ic">${icon(p.kind === 'portes' ? 'truck' : 'gift', big ? 30 : 22)}</span><div><b>${esc(L(p.title))}</b><span class="small">${esc(L(p.text))}</span>
@@ -299,7 +309,7 @@ function reviewsSection(p, app) {
   return `<section class="${app ? 'a-sec' : 'sec-tight'}" id="avaliacoes"><div class="${app ? '' : 'wrap'}">
     <div class="row-between"><h2>${T('Avaliações', 'Reviews')}</h2>${list.length ? `<span>${stars(Math.round(avg))} <b>${numFmt(round2(avg))}</b> <span class="small muted">(${list.length})</span></span>` : ''}</div>
     ${can ? `<form class="form panel mt-s" data-review-form="${p.id}" novalidate><p class="lbl">${T('Já recebeu este produto. O que achou?', 'You have received this product. What did you think?')}</p>
-      <div class="star-pick" role="radiogroup" aria-label="${T('Estrelas', 'Stars')}">${[1, 2, 3, 4, 5].map(n => `<label><input type="radio" name="rv-s" value="${n}" class="sr"${n === 5 ? ' checked' : ''}><span aria-hidden="true">★</span><span class="sr">${n}</span></label>`).join('')}</div>
+      ${starPick('rv-s', 5)}
       <div class="field"><label for="rv-c">${T('Comentário (opcional)', 'Comment (optional)')}</label><textarea id="rv-c" rows="3" maxlength="600"></textarea></div>
       <p class="small muted">${T('A avaliação só se envia uma vez. Aparece com o seu primeiro nome.', 'The review is sent only once. It shows with your first name.')}</p>
       <button class="btn btn-green btn-sm" type="submit">${T('Enviar avaliação', 'Send review')}</button></form>`
@@ -309,9 +319,34 @@ function reviewsSection(p, app) {
         ${u && u.role === 'admin' ? `<form class="reply-form" data-review-reply="${r.id}"><label class="sr" for="rr-${r.id}">${T('Responder', 'Reply')}</label><textarea id="rr-${r.id}" rows="2" placeholder="${T('Responder em nome da Daqui', 'Reply on behalf of Daqui')}">${r.reply ? esc(r.reply.text) : ''}</textarea><button class="btn btn-line btn-sm c-campo" type="submit">${r.reply ? T('Atualizar resposta', 'Update reply') : T('Responder', 'Reply')}</button></form>` : ''}</li>`).join('')}</ul>`
       : `<p class="muted small mt-s">${T('Ainda não há avaliações.', 'No reviews yet.')}</p>`}</div></section>`;
 }
+/* escolher estrelas: no HTML vão da 5 para a 1 e o CSS (row-reverse) mostra-as da 1 para a 5, para o realce funcionar com "~" */
+const starPick = (name, val) => `<div class="star-pick" role="radiogroup" aria-label="${T('Estrelas', 'Stars')}">${[5, 4, 3, 2, 1].map(n => `<label><input type="radio" name="${name}" value="${n}" class="sr"${n === val ? ' checked' : ''}><span aria-hidden="true">★</span><span class="sr">${n} ${n === 1 ? T('estrela', 'star') : T('estrelas', 'stars')}</span></label>`).join('')}</div>`;
+/* conta: as minhas avaliações (editar ou apagar) */
+let revEdit = '';
+function accReviewsSection(u) {
+  if (u.role === 'admin') return '';
+  const mine = PRODUCT_REVIEWS.filter(r => (NUVEM.on ? r.mine : r.user === u.username) && P(r.product)).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return `<section class="acc-sec" id="avaliacoes"><h2>${T('As minhas avaliações', 'My reviews')}</h2>
+    ${mine.length ? `<ul class="reviews mt-s">${mine.map(r => { const p = P(r.product), ed = revEdit === String(r.id);
+      return `<li><div class="row-between"><a class="row-gap" href="${productHref(p)}"><span class="thumb sm">${artFor(p)}</span><b>${esc(L(p.name))}</b></a>${ed ? '' : stars(r.stars)}</div>
+        ${ed ? `<form class="form mt-s" data-review-edit="${r.id}" novalidate>${starPick('re-s', r.stars)}<div class="field"><label for="re-c">${T('Comentário', 'Comment')}</label><textarea id="re-c" rows="3" maxlength="600">${esc(r.comment)}</textarea></div>
+          <div class="row-btns"><button class="btn btn-green btn-sm" type="submit">${T('Guardar', 'Save')}</button><button type="button" class="btn btn-line btn-sm" data-review-cancel>${T('Cancelar', 'Cancel')}</button></div></form>`
+          : `${r.comment ? `<p>${esc(r.comment)}</p>` : ''}<span class="small muted">${fdate(new Date(r.at), { day: 'numeric', month: 'short', year: 'numeric' })}</span>${r.reply ? `<div class="reply"><b>${T('Resposta da Daqui', 'Reply from Daqui')}</b><p>${esc(r.reply.text)}</p></div>` : ''}
+          <div class="row-btns mt-s"><button class="btn btn-ghost btn-sm" data-review-open="${r.id}">${icon('edit', 14)} ${T('Editar', 'Edit')}</button><button class="btn btn-ghost btn-sm c-tomato" data-review-del="${r.id}">${icon('trash', 14)} ${T('Apagar', 'Delete')}</button></div>`}</li>`; }).join('')}</ul>`
+      : `<p class="muted small mt-s">${T('Ainda não avaliou produtos. Depois de receber uma encomenda, pode avaliar cada produto na página dele.', 'You have not reviewed anything yet. Once you receive an order, you can review each product on its page.')}</p>`}</section>`;
+}
+PAGE_EVENTS.click.push((e, t, d) => {
+  if (d.reviewOpen) { revEdit = d.reviewOpen; rerenderKeep('#re-c'); return true; }
+  if ('reviewCancel' in d) { revEdit = ''; rerenderKeep(); return true; }
+  if (d.reviewDel) { if (t.dataset.confirm !== '1') { t.dataset.confirm = '1'; t.innerHTML = icon('trash', 14) + ' ' + T('Confirmar', 'Confirm'); return true; } deleteReview(d.reviewDel); toast(T('Avaliação apagada', 'Review deleted')); rerenderKeep(); return true; }
+});
+PAGE_EVENTS.submit.push((e, f) => {
+  if (!f.matches('[data-review-edit]')) return; e.preventDefault();
+  editReview(f.dataset.reviewEdit, +(f.querySelector('[name="re-s"]:checked') || {}).value || 5, $('#re-c', f).value || ''); revEdit = ''; toast(T('Avaliação atualizada', 'Review updated')); rerenderKeep(); return true;
+});
 /* depois de receber uma encomenda: convite para avaliar cada produto */
 function reviewPrompts(u, o) {
-  if (orderStage(o) < 3 || o.status === 'cancelada') return '';
+  if (orderStage(o) !== STAGE_DONE) return '';
   const todo = [...new Set(o.items.map(i => i.id))].map(P).filter(p => p && !myReview(u, p.id));
   return todo.length ? `<p class="small oc-rev">${icon('star', 14)} ${T('Avaliar', 'Review')}: ${todo.slice(0, 4).map(p => `<a class="link" href="${productHref(p)}#avaliacoes">${esc(L(p.name))}</a>`).join(', ')}</p>` : '';
 }
@@ -350,3 +385,19 @@ PAGES.cooperativa = () => {
   </div></section><div class="spacer"></div>`;
   return { title: T('Cooperativa Daqui', 'Daqui Co-op'), html };
 };
+
+/* ---------- Cooperativa em destaque: estrela de membro, aviso de poupança nos portes e cartão na app ---------- */
+const memberStar = (u, big) => (isMember(u) ? `<span class="coop-star${big ? ' big' : ''}" title="${T('Membro da Cooperativa Daqui', 'Daqui Co-op member')}" role="img" aria-label="${T('Membro da Cooperativa Daqui', 'Daqui Co-op member')}">★</span>` : '');
+function coopUpsell(fee) {
+  const u = currentUser(); if (isMember(u) || !(fee > 0)) return '';
+  return `<div class="coop-upsell">${icon('star', 20)}<span><b>${T(`Membros da Cooperativa não pagam portes`, `Co-op members never pay delivery`)}</b><br><span class="small">${T(`Poupava ${money(fee)} nesta encomenda e em todas as seguintes, por ${money(SETTINGS.coopFee)}/ano.`, `You would save ${money(fee)} on this order and every one after, for ${money(SETTINGS.coopFee)}/year.`)}</span></span><a class="link small" href="${href('cooperativa')}">${T('Saber mais', 'Learn more')}</a></div>`;
+}
+function coopAppCard(u) {
+  if (u && u.role !== 'cliente' && !u.partner && u.role === 'admin') return '';
+  if (isMember(u)) return `<section class="a-sec"><a class="a-coop on" href="#/cooperativa"><span class="a-coop-star">★</span><span><b>${T('Membro da Cooperativa', 'Co-op member')}</b><span class="small">${T('Portes grátis até', 'Free delivery until')} ${fdate(parseISO(u.coopUntil), { day: 'numeric', month: 'long', year: 'numeric' })}</span></span>${icon('chevR', 18)}</a></section>`;
+  return `<section class="a-sec"><a class="a-coop" href="#/cooperativa"><span class="a-coop-star">★</span><span><b>${T('Junta-te à Cooperativa', 'Join the Co-op')}</b><span class="small">${T(`Portes grátis, prioridade no Colhe Connosco e voto na assembleia. ${money(SETTINGS.coopFee)}/ano.`, `Free delivery, Join the Harvest priority and a vote. ${money(SETTINGS.coopFee)}/year.`)}</span></span><span class="a-coop-cta">${T('Ver', 'See')}</span></a></section>`;
+}
+function coopHeroSVG() {
+  const pts = n => Array.from({ length: n }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 46 : 112; return `${(160 + r * Math.cos(a)).toFixed(1)},${(160 + r * Math.sin(a)).toFixed(1)}`; }).join(' ');
+  return `<svg viewBox="0 0 320 320" role="img" aria-label="${T('Estrela da Cooperativa Daqui', 'Daqui Co-op star')}"><circle cx="160" cy="160" r="150" fill="none" stroke="#F2C663" stroke-width="3"/><circle cx="160" cy="160" r="132" fill="none" stroke="#F2C663" stroke-width="1.5" stroke-dasharray="3 7"/><polygon points="${pts(10)}" fill="#F2C663"/></svg>`;
+}

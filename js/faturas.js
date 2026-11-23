@@ -41,6 +41,15 @@ function invoiceData(key) {
     return { type: T('Fatura-recibo', 'Invoice-receipt'), no: docNo('FR', 'Q' + m.id), date: m.at, ref: '', buyer,
       lines: [{ desc: `${T('Quota anual da Cooperativa Daqui', 'Daqui Co-op yearly fee')}${ini ? ` (${fdate(parseISO(ini))} – ${fdate(parseISO(fim))})` : ''}`, qty: 1, unit: '', price: m.value, vat: VAT_STD }], paid: [[payName(m.method), m.value]] };
   }
+  if (kind === 'farm') {
+    /* nota de pagamento ao agricultor (autofaturação): vendas do mês × parte do agricultor na divisão do preço */
+    const f = F(a), month = b, rows = (FARM_SALES[a] || []).filter(r => r.date.slice(0, 7) === month); if (!f || !rows.length) return null;
+    const by = {}; rows.forEach(r => { const k = r.product + '|' + r.price; (by[k] = by[k] || { product: r.product, price: r.price, qty: 0 }).qty = round2(by[k].qty + r.qty); });
+    const lines = Object.values(by).map(x => { const p = P(x.product), pct = splitOf(p || {})[0]; return { desc: `${p ? L(p.name) : x.product} (${T('venda a', 'sold at')} ${money(x.price)}${p && byKg(p) ? '/kg' : ''}, ${pct}% ${T('para o agricultor', 'to the farmer')})`, qty: x.qty, unit: p && byKg(p) ? 'kg' : T('un.', 'pc'), price: round2(x.price * pct / 100), vat: VAT_FOOD }; });
+    const last = new Date(+month.slice(0, 4), +month.slice(5, 7), 0, 12), pay = new Date(last.getFullYear(), last.getMonth() + 1, 10, 12);
+    return { type: T('Autofaturação', 'Self-billing invoice'), no: docNo('AF', f.id + month), date: iso(last), ref: `${monthName(+month.slice(5, 7))} ${month.slice(0, 4)}`, party: T('Fornecedor (agricultor)', 'Supplier (farmer)'),
+      buyer: { name: `${f.name}, ${f.farm}`, nif: '', addr: `${f.place}, ${regionName(f.region)}` }, lines, paid: [[T(`Transferência bancária a ${fdate(pay)}`, `Bank transfer on ${fdate(pay)}`), null]] };
+  }
   if (kind === 'prep') {
     const pr = PREPS.find(x => x.id === a), uu = USERS[b] || u, s = pr && uu && (uu.subs || []).find(x => x.id === pr.sub); if (!s) return null;
     const q = quote([{ id: s.box, qty: 1, price: s.locked, opts: { kg: s.kg } }], s.deliver, uu, null, false);
@@ -64,11 +73,11 @@ function invoiceHTML(d) {
   return `<div class="invoice">
     <div class="inv-head"><div><img src="${LOGO_GOLD}" alt="Daqui" width="96"><p class="small">${esc(COMPANY.name)}<br>${esc(COMPANY.addr)}<br>NIF ${COMPANY.nif}</p></div>
       <div class="ta-r"><h2>${esc(d.type)}</h2><p><b>${esc(d.no)}</b><br><span class="small muted">${fdate(String(d.date).slice(0, 10) ? parseISO(String(d.date).slice(0, 10)) : today(), { day: 'numeric', month: 'long', year: 'numeric' })}</span>${d.ref ? `<br><span class="small muted">${T('Referência', 'Reference')}: ${esc(d.ref)}</span>` : ''}</p></div></div>
-    <div class="inv-buyer"><span class="lbl">${T('Cliente', 'Customer')}</span><b>${esc(d.buyer.name || T('Consumidor final', 'Final consumer'))}</b><span class="small">${T('NIF', 'Tax no.')}: ${esc(d.buyer.nif || T('consumidor final', 'final consumer'))}${d.buyer.addr ? `<br>${esc(d.buyer.addr)}` : ''}</span></div>
+    <div class="inv-buyer"><span class="lbl">${esc(d.party || T('Cliente', 'Customer'))}</span><b>${esc(d.buyer.name || T('Consumidor final', 'Final consumer'))}</b><span class="small">${T('NIF', 'Tax no.')}: ${esc(d.buyer.nif || T('consumidor final', 'final consumer'))}${d.buyer.addr ? `<br>${esc(d.buyer.addr)}` : ''}</span></div>
     <table class="tbl inv-tbl"><thead><tr><th>${T('Descrição', 'Description')}</th><th class="ta-r">${T('Qtd.', 'Qty')}</th><th class="ta-r">${T('Preço', 'Price')}</th><th class="ta-r">${T('IVA', 'VAT')}</th><th class="ta-r">Total</th></tr></thead>
       <tbody>${t.rows.map(r => `<tr><td>${esc(r.desc)}</td><td class="ta-r">${numFmt(r.qty)}${r.unit ? ' ' + r.unit : ''}</td><td class="ta-r">${money(r.price)}</td><td class="ta-r">${r.vat}%</td><td class="ta-r">${money(r.tot)}</td></tr>`).join('')}</tbody></table>
     <div class="inv-sum"><dl class="dl">${Object.entries(t.byVat).map(([v, x]) => `<div><dt>${T('Base', 'Base')} ${v}%</dt><dd>${money(x.base)}</dd></div><div><dt>${T('IVA', 'VAT')} ${v}%</dt><dd>${money(x.tax)}</dd></div>`).join('')}
-      <div class="tot"><dt>Total</dt><dd>${money(t.total)}</dd></div>${d.paid.map(([m, v]) => `<div><dt>${T('Pago com', 'Paid with')} ${esc(m)}</dt><dd>${money(v)}</dd></div>`).join('')}</dl></div>
+      <div class="tot"><dt>Total</dt><dd>${money(t.total)}</dd></div>${d.paid.map(([m, v]) => `<div><dt>${v == null ? esc(m) : `${T('Pago com', 'Paid with')} ${esc(m)}`}</dt><dd>${money(v == null ? t.total : v)}</dd></div>`).join('')}</dl></div>
     <p class="small muted mt">${T('Documento de demonstração, sem valor fiscal (projeto académico IPA, Universidade de Aveiro). Preços com IVA incluído.', 'Demonstration document with no tax value (IPA academic project, University of Aveiro). Prices include VAT.')} ATCUD: DEMO-${d.no.replace(/\D/g, '')}</p></div>`;
 }
 function openInvoice(key) {
@@ -100,7 +109,7 @@ function invoicePDF(d) {
   if (d.ref) txt(T('Referência', 'Reference') + ': ' + d.ref, W - M, y - 13, 9, false, undefined, 'r');
   y -= 56;
   rect(M, y - 52, W - 2 * M, 62, '0.96 0.95 0.89');
-  txt(T('Cliente', 'Customer'), M + 12, y - 6, 8, true, '0.40 0.45 0.30');
+  txt(d.party || T('Cliente', 'Customer'), M + 12, y - 6, 8, true, '0.40 0.45 0.30');
   txt(d.buyer.name || T('Consumidor final', 'Final consumer'), M + 12, y - 21, 11, true);
   txt(T('NIF', 'Tax no.') + ': ' + (d.buyer.nif || T('consumidor final', 'final consumer')), M + 12, y - 35, 9);
   if (d.buyer.addr) txt(d.buyer.addr, M + 12, y - 47, 9);
@@ -122,7 +131,7 @@ function invoicePDF(d) {
   y -= 10; let sy = y;
   Object.entries(t.byVat).forEach(([v, x]) => { txt(`${T('Base tributável', 'Taxable base')} ${v}%`, W - M - 170, sy, 9); txt(fmtE(x.base), W - M, sy, 9, false, undefined, 'r'); sy -= 13; txt(`${T('IVA', 'VAT')} ${v}%`, W - M - 170, sy, 9); txt(fmtE(x.tax), W - M, sy, 9, false, undefined, 'r'); sy -= 15; });
   rect(W - M - 180, sy - 10, 180, 24, '0.97 0.84 0.30'); txt('Total', W - M - 170, sy - 2, 12, true); txt(fmtE(t.total), W - M - 8, sy - 2, 12, true, undefined, 'r'); sy -= 34;
-  d.paid.forEach(([m, v]) => { txt(`${T('Pago com', 'Paid with')} ${m}`, W - M - 170, sy, 9); txt(fmtE(v), W - M, sy, 9, false, undefined, 'r'); sy -= 13; });
+  d.paid.forEach(([m, v]) => { txt(v == null ? m : `${T('Pago com', 'Paid with')} ${m}`, W - M - 170, sy, 9); txt(fmtE(v == null ? t.total : v), W - M, sy, 9, false, undefined, 'r'); sy -= 13; });
   /* rodapé */
   line(M, 70, W - M, 70);
   txt(T('Documento de demonstração, sem valor fiscal. Projeto académico IPA, Universidade de Aveiro.', 'Demonstration document with no tax value. IPA academic project, University of Aveiro.'), M, 56, 8, false, '0.45 0.48 0.38');
@@ -151,3 +160,24 @@ PAGE_EVENTS.click.push((e, t, d) => {
   if (d.invoice) { openInvoice(d.invoice); return true; }
   if (d.invoicePdf) { downloadInvoice(d.invoicePdf); return true; }
 });
+
+/* ---------- vendas de cada agricultor (para as notas de pagamento) ---------- */
+const FARM_SALES = {};
+async function loadFarmerSales(fid) {
+  if (NUVEM.on) { try { FARM_SALES[fid] = ((await NUVEM.farmerSales(fid)) || []).map(r => ({ date: r.data, ref: r.ref, product: r.produto, qty: +r.qtd, price: +r.preco, kind: r.tipo })); } catch (e) { FARM_SALES[fid] = []; } return FARM_SALES[fid]; }
+  const mine = new Set(LOTS.filter(l => l.farmer === fid).map(l => l.id)), out = [];
+  ORDERS.filter(o => o.status !== 'cancelada').forEach(o => (o.lots || []).filter(x => mine.has(x.lote)).forEach(x => { const l = LOTS.find(y => y.id === x.lote), it = o.items.find(i => i.id === l.product); out.push({ date: o.slot, ref: o.num, product: l.product, qty: x.qtd, price: it ? it.price : (P(l.product) || {}).price || 0, kind: 'encomenda' }); }));
+  PREPS.forEach(p => (p.lots || []).filter(x => mine.has(x.lote)).forEach(x => { const l = LOTS.find(y => y.id === x.lote); out.push({ date: p.date, ref: p.id, product: l.product, qty: x.qtd, price: (P(l.product) || {}).price || 0, kind: 'caixa' }); }));
+  return (FARM_SALES[fid] = out);
+}
+function farmerPaySection(f) {
+  const rows = FARM_SALES[f.id];
+  if (!rows) { setTimeout(() => loadFarmerSales(f.id).then(() => { if ($('#pagamentos')) rerenderKeep(); }), 0); return `<section class="acc-sec" id="pagamentos"><h2>${T('Vendas e pagamentos', 'Sales and payments')}</h2><p class="muted mt-s">${T('A carregar as vendas…', 'Loading sales…')}</p></section>`; }
+  const months = {}; rows.forEach(r => { const m = r.date.slice(0, 7), p = P(r.product), pct = splitOf(p || {})[0]; const x = months[m] = months[m] || { gross: 0, mine: 0, n: 0 }; x.gross = round2(x.gross + r.qty * r.price); x.mine = round2(x.mine + r.qty * r.price * pct / 100); x.n++; });
+  const list = Object.entries(months).sort((a, b) => b[0].localeCompare(a[0]));
+  return `<section class="acc-sec" id="pagamentos"><h2>${T('Vendas e pagamentos', 'Sales and payments')}</h2>
+    <p class="muted mt-s">${T('O que a Daqui vendeu das suas entregas, mês a mês. Recebe a sua parte do preço de venda (a percentagem do agricultor na divisão do preço de cada produto), por transferência, até dia 10 do mês seguinte. A nota de pagamento (autofaturação) pode ser descarregada em PDF.', 'What Daqui sold from your supplies, month by month. You receive your share of the selling price (the farmer\'s percentage in each product\'s price split) by bank transfer by the 10th of the following month. The payment note (self-billing invoice) can be downloaded as a PDF.')}</p>
+    ${list.length ? `<ul class="inv-list mt-s">${list.map(([m, x]) => `<li><span class="inv-ic">${icon('receipt', 20)}</span><span><b>${monthName(+m.slice(5, 7))} ${m.slice(0, 4)}</b><br><span class="small muted">${x.n} ${x.n === 1 ? T('venda', 'sale') : T('vendas', 'sales')} · ${T('vendido por', 'sold for')} ${money(x.gross)}</span></span><b class="c-ok">${money(x.mine)}</b>
+      <span class="row-gap"><button class="btn btn-line btn-sm c-campo" data-invoice="farm|${f.id}|${m}">${T('Ver', 'View')}</button><button class="btn btn-ghost btn-sm" data-invoice-pdf="farm|${f.id}|${m}">${icon('download', 16)} PDF</button></span></li>`).join('')}</ul>`
+      : `<p class="muted small mt-s">${T('Ainda não há vendas das suas entregas.', 'No sales from your supplies yet.')}</p>`}</section>`;
+}

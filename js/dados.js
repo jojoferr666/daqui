@@ -39,6 +39,7 @@ function latestHarvest(pid, fid) {
 }
 function saveLot(l) {
   const i = LOTS.findIndex(x => x.id === l.id); if (i >= 0) LOTS[i] = l; else LOTS.push(l);
+  if (i < 0 && !NUVEM.on && P(l.product)) { const f = F(l.farmer); notifyAdminsLocal(T(`Entrega nova: ${L(P(l.product).name)}`, `New supply: ${L(P(l.product).name)}`), `${f ? f.name : l.farmer}: ${stockText(P(l.product), l.qty)}, ${T('colhido a', 'picked on')} ${fdate(parseISO(l.harvest))}${l.transport === 'recolha' ? T(`. Recolher a ${fdate(parseISO(l.pickup))}.`, `. Collect on ${fdate(parseISO(l.pickup))}.`) : '.'}`, 'conta?tab=inventario'); }
   if (NUVEM.on) return NUVEM.saveLot(l); saveLotsLocal(); return Promise.resolve();
 }
 function deleteLot(id) { const i = LOTS.findIndex(x => x.id === id); if (i >= 0) LOTS.splice(i, 1); if (NUVEM.on) return NUVEM.deleteLot(id); saveLotsLocal(); return Promise.resolve(); }
@@ -72,7 +73,7 @@ const reviewsOf = pid => PRODUCT_REVIEWS.filter(r => r.product === pid).sort((a,
 /* pode avaliar: comprou e já recebeu (encomenda entregue/levantada) e ainda não avaliou */
 function boughtAndReceived(u, pid) {
   if (!u) return false;
-  return ORDERS.some(o => (o.user === u.username || (u._id && o._uid === u._id)) && o.status !== 'cancelada' && o.items.some(i => i.id === pid) && orderStage(o) >= 3);
+  return ORDERS.some(o => (o.user === u.username || (u._id && o._uid === u._id)) && o.status !== 'cancelada' && o.items.some(i => i.id === pid) && orderStage(o) === STAGE_DONE) || PREPS.some(p => p.user === uidOf(u) && (p.stage === 4 || p.date < iso(today())) && (p.box === pid || p.items.some(i => i.id === pid)));
 }
 const myReview = (u, pid) => PRODUCT_REVIEWS.find(r => r.product === pid && (NUVEM.on ? r.mine : r.user === (u && u.username)));
 async function addReview(pid, stars, comment) {
@@ -80,6 +81,7 @@ async function addReview(pid, stars, comment) {
   const r = { id: 'R' + Date.now().toString(36), product: pid, user: u.username, name: firstName(u.name), stars, comment: comment.trim().slice(0, 600), at: nowISO(), mine: true, reply: null };
   PRODUCT_REVIEWS.unshift(r);
   if (NUVEM.on) return NUVEM.addReview(pid, stars, r.comment);
+  notifyAdminsLocal(T(`Avaliação nova: ${L(P(pid).name)} (${stars}★)`, `New review: ${L(P(pid).name)} (${stars}★)`), `${r.name}${r.comment ? ': ' + r.comment.slice(0, 100) : '.'}`, 'produtos/' + pid);
   store.set(PREV_KEY, PRODUCT_REVIEWS);
 }
 function replyReview(id, text) {
@@ -89,6 +91,13 @@ function replyReview(id, text) {
   store.set(PREV_KEY, PRODUCT_REVIEWS);
   if (r.reply) pushNotifLocal(r.user, T('A Daqui respondeu à sua avaliação', 'Daqui replied to your review'), r.reply.text, 'produtos/' + r.product);
 }
+function editReview(id, stars, comment) {
+  const r = PRODUCT_REVIEWS.find(x => String(x.id) === String(id)); if (!r) return;
+  r.stars = Math.max(1, Math.min(5, stars)); r.comment = comment.trim().slice(0, 600);
+  if (NUVEM.on) return NUVEM.editReview(r.id, r.stars, r.comment);
+  store.set(PREV_KEY, PRODUCT_REVIEWS);
+}
+function deleteReview(id) { const i = PRODUCT_REVIEWS.findIndex(x => String(x.id) === String(id)); if (i < 0) return; const r = PRODUCT_REVIEWS.splice(i, 1)[0]; if (NUVEM.on) return NUVEM.deleteReview(r.id); store.set(PREV_KEY, PRODUCT_REVIEWS); }
 const reviewAvg = pid => { const rs = reviewsOf(pid); return rs.length ? rs.reduce((a, r) => a + r.stars, 0) / rs.length : 0; };
 
 /* ---------- Saldo Daqui, Cooperativa, promoções e notificações ---------- */
@@ -150,6 +159,14 @@ function pushNotifLocal(user, title, text, route, promo) {
   NOTIFS.unshift({ id: 'N' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), user, title: { pt: title, en: title }, text: { pt: text || '', en: text || '' }, route: route || '', promo: promo || null, read: false, at: nowISO() });
   NOTIFS.splice(200); store.set(NOTIFS_KEY, NOTIFS);
 }
+/* sem base de dados: avisos para as contas de gestão (com base de dados quem avisa são os triggers do supabase/10) */
+/* sem base de dados: avisa o cliente quando a encomenda muda de estado (com base de dados é o gatilho do supabase/10) */
+function notifyStageLocal(o) {
+  if (NUVEM.on || !o || !o.user) return;
+  const st = orderStage(o), pick = o.deliver !== 'home', names = { 1: 'Em preparação', 2: 'Preparada', 3: pick ? 'Pronta no ponto de recolha' : 'Em distribuição', 4: pick ? 'Levantada' : 'Entregue', 5: 'Cancelada' };
+  if (names[st]) pushNotifLocal(o.user, `Encomenda ${o.num}: ${names[st]}`, st === 3 && !pick ? 'A sua encomenda saiu para entrega.' : '', '/encomenda/' + o.num);
+}
+function notifyAdminsLocal(title, text, route) { if (NUVEM.on) return; Object.values(USERS).filter(x => x.role === 'admin').forEach(a => pushNotifLocal(a.username, title, text, route)); }
 function readNotifs(u) { const ids = myNotifs(u).filter(n => !n.read).map(n => n.id); myNotifs(u).forEach(n => { n.read = true; }); if (NUVEM.on) NUVEM.readNotifs(ids); else store.set(NOTIFS_KEY, NOTIFS); }
 function deleteNotif(id) { const i = NOTIFS.findIndex(n => String(n.id) === String(id)); if (i >= 0) NOTIFS.splice(i, 1); if (NUVEM.on) NUVEM.deleteNotif(id); else store.set(NOTIFS_KEY, NOTIFS); }
 
@@ -191,7 +208,10 @@ function quote(items, where, u, promo, useBalance) {
 const prepOf = (subId, date) => PREPS.find(p => p.sub === subId && p.date === date);
 function savePrep(p) {
   const i = PREPS.findIndex(x => x.id === p.id), old = i >= 0 ? PREPS[i] : null;
-  if (!NUVEM.on) { if (old) giveBackLocal(old.lots); p.lots = takeStockLocal(p.items); }
+  if (p.stage == null) p.stage = 2;
+  if (!NUVEM.on && (!old || JSON.stringify(old.items) !== JSON.stringify(p.items))) { if (old) giveBackLocal(old.lots); p.lots = takeStockLocal(p.items); }
+  else if (!NUVEM.on && old) p.lots = old.lots;
+  if (!NUVEM.on && p.sub && p.user && (!old || old.stage !== p.stage)) pushNotifLocal(p.user, ({ 2: T('A sua caixa está preparada', 'Your box is packed'), 3: T('A sua caixa está em distribuição', 'Your box is out for delivery'), 4: T('A sua caixa foi entregue', 'Your box was delivered') })[p.stage], p.stage === 4 ? T('Já pode ver o que veio na caixa.', 'You can now see what was in the box.') : T('O conteúdo é surpresa até chegar!', 'What is inside is a surprise until it arrives!'), 'conta?sec=encomendas');
   if (i >= 0) PREPS[i] = p; else PREPS.push(p);
   if (NUVEM.on) return NUVEM.savePrep(p);
   store.set(PREPS_KEY, PREPS); return Promise.resolve();
@@ -224,4 +244,36 @@ function loadLocalExtras() {
   fill2(CLAIMS, store.get(CLAIMS_KEY, []));
   fill2(NOTIFS, store.get(NOTIFS_KEY, []));
   fill2(PREPS, store.get(PREPS_KEY, []));
+}
+
+/* ---------- caixas das subscrições na lista de encomendas (cliente e gestão) ----------
+   Uma entrada por caixa já preparada e uma pela próxima entrega de cada subscrição ativa ainda por preparar.
+   O cliente só vê o conteúdo depois de a caixa ser entregue (etapa 4): até lá é surpresa. */
+const BOX_STAGES = () => [T('Agendada', 'Scheduled'), T('Em preparação', 'Being packed'), T('Preparada', 'Packed'), T('Em distribuição', 'Out for delivery'), T('Entregue', 'Delivered')];
+function subDeliveries(u) {
+  if (!u) return [];
+  const mine = PREPS.filter(p => p.sub && p.user === uidOf(u)).map(p => { const s = (u.subs || []).find(x => x.id === p.sub) || {}; return { id: p.id, sub: p.sub, date: p.date, box: p.box || s.box, size: p.size || s.size, stage: p.date < iso(today()) && p.stage < 4 ? 4 : p.stage, items: p.items, s }; });
+  (u.subs || []).filter(s => s.status === 'ativa').forEach(s => { const d = iso(nextDelivery(s)); if (!mine.some(x => x.sub === s.id && x.date === d)) mine.push({ id: `${s.id}-${d}`, sub: s.id, date: d, box: s.box, size: s.size, stage: 0, items: [], s }); });
+  return mine.filter(x => P(x.box)).sort((a, b) => b.date.localeCompare(a.date));
+}
+function boxDeliveryCard(x, app) {
+  const b = P(x.box), done = x.stage === 4, cls = x.stage === 4 ? 'ativa' : x.stage >= 2 ? 'ativa' : 'prog';
+  const contents = done ? `<ul class="box-got">${x.items.map(i => P(i.id) ? `<li><span class="thumb sm">${artFor(P(i.id))}</span>${esc(L(P(i.id).name))} <span class="small muted">${byKg(P(i.id)) ? numFmt(i.qty) + ' kg' : numFmt(i.qty) + ' ' + unitWord(P(i.id).unit, i.qty)}</span></li>` : '').join('')}</ul>`
+    : `<p class="small muted">${icon('gift', 14)} ${T('O conteúdo é surpresa: aparece aqui depois de entregue.', 'What is inside is a surprise: it shows here once delivered.')}</p>`;
+  return `<article class="${app ? 'a-order a-boxdel' : 'ordcard boxdel'}"><div class="oc-thumbs"><span class="thumb">${artFor(b)}</span></div>
+    <div><div class="row-gap"><b>${esc(L(b.name))}</b> <span class="small muted">${sizeName(x.size)}</span><span class="status ${cls}">${BOX_STAGES()[x.stage]}</span></div>
+      <p class="small muted">${T('Subscrição', 'Subscription')} · ${T('entrega', 'delivery')} ${fdate(parseISO(x.date), { weekday: 'long', day: 'numeric', month: 'short' })}</p>${contents}
+      ${done && x.items.length ? `<button class="link small" data-invoice="prep|${x.id}|${currentUser() ? currentUser().username : ''}">${icon('receipt', 14)} ${T('Fatura', 'Invoice')}</button>` : ''}</div></article>`;
+}
+
+/* sem base de dados: aviso de "caixas a preparar" 48 h antes da distribuição (com base de dados é o pg_cron do supabase/10) */
+function localPrepNotice() {
+  const u = currentUser(); if (NUVEM.on || !u || u.role !== 'admin') return;
+  const d = addDays(today(), 2); if (![4, 6].includes(d.getDay())) return;
+  const key = 'daqui-aviso-preparar-' + iso(d); if (store.get(key, false)) return;
+  const nsub = Object.values(USERS).reduce((a, c) => a + (c.subs || []).filter(s => s.status === 'ativa' && Math.round((d - parseISO(s.first)) / 864e5) >= 0 && Math.round((d - parseISO(s.first)) / 864e5) % (FREQ_DAYS[s.freq] || 7) === 0).length, 0);
+  const nenc = ORDERS.filter(o => o.slot === iso(d) && o.status !== 'cancelada' && orderStage(o) < 2).length;
+  if (!nsub && !nenc) return;
+  store.set(key, true);
+  pushNotifLocal(u.username, T(`Preparar para ${fdate(d, { weekday: 'long' })}`, `To prepare for ${fdate(d, { weekday: 'long' })}`), T(`${nsub} caixas de subscrição e ${nenc} encomendas. Abra "Preparar caixas".`, `${nsub} subscription boxes and ${nenc} orders. Open "Prepare boxes".`), 'conta?tab=preparar');
 }

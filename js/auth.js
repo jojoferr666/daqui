@@ -223,10 +223,11 @@ function newOrderNumber() { if (NUVEM.on) return NUVEM.newOrderNumber(); const m
 const normOrder = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const findOrder = num => ORDERS.find(o => o.num === normOrder(num)) || null;
 function orderStage(o, now = new Date()) {
-  if (o.status === 'cancelada') return 4;
+  /* etapas: 0 Recebida, 1 Em preparação, 2 Preparada, 3 Em distribuição (no levantamento: pronta para levantar), 4 Entregue/Levantada, 5 Cancelada */
+  if (o.status === 'cancelada') return 5;
   if (typeof o.stage === 'number') return o.stage;
   const slot = new Date(o.slot + 'T08:00:00'), prep = new Date(slot); prep.setDate(prep.getDate() - 1); const done = new Date(o.slot + 'T21:00:00');
-  return now < prep ? 0 : now < slot ? 1 : now < done ? 2 : 3;
+  return now < prep ? 0 : now < slot ? 1 : now < done ? 3 : 4;
 }
 function addRequest(type, fields, extra = {}) {
   const max = REQUESTS.reduce((m, r) => Math.max(m, +String(r.id).slice(2) || 0), 1000);

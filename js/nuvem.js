@@ -153,7 +153,7 @@ const NUVEM = (() => {
   const toNotif = r => ({ id: r.id, title: { pt: r.titulo_pt, en: r.titulo_en }, text: { pt: r.texto_pt, en: r.texto_en }, route: r.rota || '', promo: r.promo || null, read: !!r.lida, at: r.criada });
   const toMov = r => ({ id: r.id, user: r.user_id, kind: r.tipo, desc: r.descricao, value: +r.valor, balance: +r.saldo, method: r.metodo || '', ref: r.ref || '', at: r.criado });
   const toClaim = r => ({ promo: r.promo, user: r.user_id, at: r.reclamada, used: r.usada || null, order: r.encomenda || null });
-  const toPrep = r => ({ id: r.id, sub: r.subscricao, user: r.user_id, date: r.data, items: r.artigos || [], at: r.criada });
+  const toPrep = r => ({ id: r.id, sub: r.subscricao || null, order: r.encomenda || null, user: r.user_id, date: r.data, box: r.caixa || null, size: r.tamanho || null, items: r.artigos || [], stage: r.etapa == null ? 2 : +r.etapa, at: r.criada });
   const diff = (prev, row) => { const d = {}; for (const k of Object.keys(row)) if (J(row[k]) !== J(prev[k])) d[k] = row[k]; return Object.keys(d).length ? d : null; };
   const fill = (arr, items) => { arr.length = 0; items.forEach(x => arr.push(x)); };
 
@@ -187,12 +187,18 @@ const NUVEM = (() => {
     people: applyPeople, msgs: r => { if (typeof MESSAGES !== 'undefined') fill(MESSAGES, (r || []).map(toMsg)); },
     mine: r => { if (typeof NOTIFS === 'undefined') return; fill(NOTIFS, r ? r.n.map(toNotif) : []); fill(WALLET, r ? r.m.map(toMov) : []); fill(CLAIMS, r ? r.c.map(toClaim) : []); fill(PREPS, r ? r.p.map(toPrep) : []); } };
   let RAW = {};
-  async function fetchGroups(list) {
+  /* conta as alterações locais: se o utilizador mudar algo enquanto uma releitura está a caminho, essa releitura
+     não é aplicada (traria o valor antigo); a gravação que está na fila provoca outra releitura logo a seguir */
+  let localGen = 0;
+  const touched = () => { localGen++; };
+  async function fetchGroups(list, force) {
+    const g0 = localGen;
     const res = await Promise.all(list.map(g => FETCH[g]()));
+    if (!force && localGen !== g0) return false;
     list.forEach((g, i) => { RAW[g] = res[i]; });
     /* os grupos dependem uns dos outros (ex.: as encomendas precisam das contas): aplica sempre por esta ordem */
     GROUPS.filter(g => list.includes(g)).forEach(g => { if (g in RAW) APPLY[g](RAW[g]); });
-    saveCache();
+    saveCache(); return true;
   }
   function applyCat(c) {
     if (!c) return;
@@ -242,7 +248,7 @@ const NUVEM = (() => {
   }
   /* mensagens ("Falar com a Daqui"): a gestão vê todas; cada conta vê as suas; sem conta, as da conversa guardada neste navegador */
   const toMsg = r => ({ id: r.id, conv: r.conversa, user: (Object.values(USERS).find(u => u._id === r.user_id) || {}).username || null, name: r.nome || '', contact: r.contacto || '', from: r.autor, text: r.texto, at: r.criada, read: !!r.lida });
-  const loadMsgs = () => fetchGroups(['msgs']);
+  const loadMsgs = () => fetchGroups(['msgs'], true);
   async function loadGuestOrders() {
     for (const g of guestOrders().slice(0, 5)) { if (ORDERS.some(o => o.num === g.num && !o._tel)) continue; try { await lookupOrder(g.num, g.phone); } catch (e) {} }
   }
@@ -288,21 +294,21 @@ const NUVEM = (() => {
   const isAdmin = () => !!(me && me.papel === 'admin');
   const canWriteUser = u => sess && (isAdmin() || u._id === sess.user_id);
   const canWriteOrder = o => sess && (isAdmin() || (o._uid ? o._uid === sess.user_id : !!(me && o.user === me.username)));
-  N.syncUsers = () => queue(async () => {
-    for (const u of Object.values(USERS)) {
-      if (!u._id || !canWriteUser(u)) continue;
-      const row = fromUser(u), k = 'u:' + u._id, d = diff(JSON.parse(snap[k] || '{}'), row);
+  N.syncUsers = () => { touched(); const rows = Object.values(USERS).filter(u => u._id).map(u => [u, fromUser(u), (u.subs || []).map(s => [s, fromSub(s, u._id)]), (u.harvests || []).map(h => Object.assign({}, h))]); return queue(async () => {
+    for (const [u, row, subRows, hsCap] of rows) {
+      if (!canWriteUser(u)) continue;
+      const k = 'u:' + u._id, d = diff(JSON.parse(snap[k] || '{}'), row);
       if (d) { await rest('PATCH', 'perfis', 'id=' + eq(u._id), d, 'return=minimal'); snap[k] = J(row); }
-      const subs = u.subs || [];
-      for (const s of subs) {
-        const r = fromSub(s, u._id), sk = 's:' + s.id;
+      const subs = subRows.map(x => x[0]);
+      for (const [s, r] of subRows) {
+        const sk = 's:' + s.id;
         if (!snap[sk]) { await rest('POST', 'subscricoes', '', r, 'return=minimal'); snap[sk] = J(r); continue; }
         const sd = diff(JSON.parse(snap[sk]), r); if (sd) { await rest('PATCH', 'subscricoes', 'id=' + eq(s.id), sd, 'return=minimal'); snap[sk] = J(r); }
       }
       for (const sk of Object.keys(snap)) if (sk.startsWith('s:') && JSON.parse(snap[sk]).user_id === u._id && !subs.some(s => 's:' + s.id === sk)) {
         await rest('DELETE', 'subscricoes', 'id=' + eq(sk.slice(2)), undefined, 'return=minimal'); delete snap[sk];
       }
-      const hs = u.harvests || [], pre = `h:${u._id}|`;
+      const hs = hsCap, pre = `h:${u._id}|`;
       for (const h of hs) {
         const key = hKey(h), hk = pre + key, r = harvRow(h), dd = HD(key);
         if (!snap[hk]) { await rest('POST', 'inscricoes_colhe', '', { user_id: u._id, dia_id: key, dia: dd ? dd.date : h.date, pessoas: r.pessoas }, 'return=minimal'); snap[hk] = J({ pessoas: r.pessoas, avaliacao: null, comentario: null, registo: null, resposta: null }); }
@@ -313,10 +319,12 @@ const NUVEM = (() => {
         await rest('DELETE', 'inscricoes_colhe', `user_id=${eq(u._id)}&dia_id=${eq(hk.slice(pre.length))}`, undefined, 'return=minimal'); delete snap[hk];
       }
     }
-  });
-  N.syncOrders = () => queue(async () => {
-    for (const o of ORDERS) {
-      const row = fromOrder(o), k = 'o:' + o.num;
+  }); };
+  /* as linhas são lidas no momento da gravação (e não quando chega a vez na fila): assim uma releitura da base de dados
+     que esteja a meio não apaga uma alteração feita entretanto */
+  N.syncOrders = () => { touched(); const rows = ORDERS.map(o => [o, fromOrder(o)]); return queue(async () => {
+    for (const [o, row] of rows) {
+      const k = 'o:' + o.num;
       if (!snap[k]) {
         if (!sess) row.user_id = null;
         await rest('POST', 'encomendas', '', row, 'return=minimal'); snap[k] = J(row);
@@ -325,7 +333,7 @@ const NUVEM = (() => {
       }
       const d = diff(JSON.parse(snap[k]), row); if (!d) continue;
       if (canWriteOrder(o)) await rest('PATCH', 'encomendas', 'num=' + eq(o.num), d, 'return=minimal');
-      else if (o._tel && d.etapa === 3) {
+      else if (o._tel && d.etapa === 4) {
         const res = await rpc('confirmar_levantamento', { p_num: o.num, p_tel: o._tel });
         if (!res) throw new Error(T('ainda não é possível confirmar o levantamento', 'collection cannot be confirmed yet'));
       }
@@ -335,16 +343,16 @@ const NUVEM = (() => {
       }
       snap[k] = J(row);
     }
-  });
-  N.syncRequests = () => queue(async () => {
+  }); };
+  N.syncRequests = () => (touched(), queue(async () => {
     for (const r of REQUESTS) {
       const row = fromReq(r), k = 'r:' + r.id;
       if (!snap[k]) { if (!sess) row.user_id = null; await rest('POST', 'pedidos', '', row, 'return=minimal'); snap[k] = J(row); continue; }
       const d = diff(JSON.parse(snap[k]), row);
       if (d && isAdmin()) { await rest('PATCH', 'pedidos', 'id=' + eq(r.id), d, 'return=minimal'); snap[k] = J(row); }
     }
-  });
-  N.pushCatalog = ch => queue(async () => {
+  }));
+  N.pushCatalog = ch => (touched(), queue(async () => {
     const up = 'resolution=merge-duplicates,return=minimal';
     for (const f of ch.newFarmers || []) await rest('POST', 'agricultores', 'on_conflict=id', fromFarmer(f, FARMERS.length), up);
     for (const [id, o] of Object.entries(ch.farmers || {})) { const p = mapPatch(o, FARMER_PATCH, F(id)); if (Object.keys(p).length) await rest('PATCH', 'agricultores', 'id=' + eq(id), p, 'return=minimal'); }
@@ -371,7 +379,7 @@ const NUVEM = (() => {
     }
     for (const r of ch.newRestaurants || []) await rest('POST', 'restaurantes', 'on_conflict=id', fromRest(r, RESTAURANTS.length), up);
     for (const [id, o] of Object.entries(ch.restaurants || {})) { const p = mapPatch(o, REST_PATCH, RESTAURANTS.find(x => x.id === id)); if (Object.keys(p).length) await rest('PATCH', 'restaurantes', 'id=' + eq(id), p, 'return=minimal'); }
-  });
+  }));
   /* fotografias das incidências: pasta pública "incidencias" do Storage (supabase/04-app.sql) */
   /* fotografias de telemóvel podem ter vários MB: reduz para no máximo 1600 px em JPEG antes de enviar (limite do balde: 5 MB) */
   function shrink(blob) {
@@ -438,6 +446,8 @@ const NUVEM = (() => {
   N.deleteLot = id => queue(() => rest('DELETE', 'lotes', 'id=' + eq(id), undefined, 'return=minimal'));
   N.saveSettings = v => queue(() => rest('POST', 'definicoes', 'on_conflict=chave', { chave: 'geral', valor: v }, 'resolution=merge-duplicates,return=minimal'));
   N.addReview = (product, stars, comment) => queue(async () => { const r = await rest('POST', 'avaliacoes_produtos', '', { produto: product, user_id: sess.user_id, estrelas: stars, comentario: comment }, 'return=representation'); return r; });
+  N.editReview = (id, stars, comment) => queue(() => rest('PATCH', 'avaliacoes_produtos', 'id=' + eq(id), { estrelas: stars, comentario: comment }, 'return=minimal'));
+  N.deleteReview = id => queue(() => rest('DELETE', 'avaliacoes_produtos', 'id=' + eq(id), undefined, 'return=minimal'));
   N.replyReview = (id, text) => queue(() => rest('PATCH', 'avaliacoes_produtos', 'id=' + eq(id), { resposta: text }, 'return=minimal'));
   N.topUp = (v, m) => rpc('carregar_saldo', { p_valor: v, p_metodo: m }).then(x => { reloadGroups(['mine'], 0); return x; });
   N.payCoop = m => rpc('pagar_quota', { p_metodo: m }).then(x => { reloadGroups(['mine', 'people'], 0); return x; });
@@ -445,7 +455,8 @@ const NUVEM = (() => {
   N.savePromo = p => queue(() => rest('POST', 'promocoes', 'on_conflict=id', fromPromo(p), 'resolution=merge-duplicates,return=minimal'));
   N.readNotifs = ids => (ids.length ? queue(() => rest('PATCH', 'notificacoes', 'id=in.(' + ids.join(',') + ')', { lida: true }, 'return=minimal'), true) : Promise.resolve());
   N.deleteNotif = id => queue(() => rest('DELETE', 'notificacoes', 'id=' + eq(id), undefined, 'return=minimal'), true);
-  N.savePrep = p => queue(() => rest('POST', 'preparacoes', 'on_conflict=id', { id: p.id, subscricao: p.sub, user_id: p.user || null, data: p.date, artigos: p.items }, 'resolution=merge-duplicates,return=minimal'));
+  N.savePrep = p => (touched(), queue(() => rest('POST', 'preparacoes', 'on_conflict=id', { id: p.id, subscricao: p.sub || null, encomenda: p.order || null, caixa: p.box || null, tamanho: p.size || null, user_id: p.user || null, data: p.date, artigos: p.items, etapa: p.stage || 2 }, 'resolution=merge-duplicates,return=minimal')));
+  N.farmerSales = id => rpc('agricultor_vendas', { p_agricultor: id || null });
   N.deletePrep = id => queue(() => rest('DELETE', 'preparacoes', 'id=' + eq(id), undefined, 'return=minimal'));
   N.changeEmail = async email => { await http('PUT', '/auth/v1/user', { email }); };
   N.balance = () => (typeof WALLET === 'undefined' || !sess ? 0 : WALLET.filter(m => m.user === sess.user_id).reduce((a, m) => a + m.balance, 0));
@@ -457,7 +468,7 @@ const NUVEM = (() => {
     if (!email) return null;
     try { setSession(await authPost('token?grant_type=password', { email, password: pass })); }
     catch (e) { if (e.status === 400 || e.status === 401) return null; throw e; }
-    N.clearCache(); await fetchGroups(['people', 'mine', 'msgs', 'reviews']); rtConnect();
+    N.clearCache(); await fetchGroups(['people', 'mine', 'msgs', 'reviews'], true); rtConnect();
     return currentUser();
   };
   /* palavra-passe: confirma a atual (entrando outra vez com ela) e só depois grava a nova no Supabase Auth */
@@ -493,7 +504,7 @@ const NUVEM = (() => {
       throw err;
     }
     if (!d || !d.access_token) return { errors: { email: 'confirm' } };
-    setSession(d); N.clearCache(); await fetchGroups(['people', 'mine', 'msgs']);
+    setSession(d); N.clearCache(); await fetchGroups(['people', 'mine', 'msgs'], true);
     const u = currentUser(); if (u) partnerRequest(u);
     rtConnect();
     return u ? { user: u } : { errors: { auth: 1 } };
@@ -546,7 +557,8 @@ const NUVEM = (() => {
       const before = signature();
       const msgsBefore = list.includes('msgs') && typeof MESSAGES !== 'undefined' ? J(MESSAGES.map(m => [m.id, m.read])) : null;
       queue(async () => {
-        await fetchGroups(list); clearDirty(list);
+        if (!(await fetchGroups(list))) { markDirty(list); reloadGroups(list, 1500); return; }
+        clearDirty(list);
         /* mensagem nova (tempo real): o chat aberto atualiza-se sem esperar */
         if (msgsBefore !== null && msgsBefore !== J(MESSAGES.map(m => [m.id, m.read])) && typeof chatAfterNew === 'function') { chatAfterNew(); return; }
         if (signature() !== before) softRender();
@@ -580,8 +592,8 @@ const NUVEM = (() => {
         if (d.length) reloadGroups(d, 0);
       } else {
         ss.del(CACHE_KEY); cacheT = Date.now(); RAW = {};
-        try { await fetchGroups(GROUPS); }
-        catch (e) { if (sess && (e.status === 401 || e.status === 403)) { clearSession(); RAW = {}; await fetchGroups(GROUPS); } else throw e; }
+        try { await fetchGroups(GROUPS, true); }
+        catch (e) { if (sess && (e.status === 401 || e.status === 403)) { clearSession(); RAW = {}; await fetchGroups(GROUPS, true); } else throw e; }
         N.on = true; saveCache(); clearDirty(GROUPS);
       }
       loadGuestOrders();

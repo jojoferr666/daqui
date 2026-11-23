@@ -434,3 +434,67 @@ body.app .a-promo-pop .a-big-btn{width:100%}
 
 body.app .a-pad>.a-h2{margin:24px 0 10px}
 body.app .a-pad>.a-h2:first-child{margin-top:4px}
+
+/* =====================================================================================
+   v12 (app): ecrãs presos à largura do telemóvel, espaçamentos iguais, Cooperativa e sininho na barra
+   ===================================================================================== */
+/* nada pode empurrar o ecrã para o lado: o que for mais largo desliza dentro de si próprio */
+html:has(body.app),body.app{overflow-x:clip;max-width:100%;overscroll-behavior-x:none}
+body.app #app,body.app .a-main,body.app .a-pad{max-width:100vw;min-width:0}
+body.app .a-main{overflow-x:clip}
+body.app img,body.app svg,body.app video,body.app canvas{max-width:100%}
+body.app .a-pad *{min-width:0}
+body.app .a-pad table{max-width:none}
+body.app .tbl-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+body.app .row,body.app .row-gap,body.app .row-btns,body.app .chips,body.app .radios{flex-wrap:wrap}
+body.app .a-chips,body.app .a-rail{overscroll-behavior-x:contain}
+body.app input,body.app select,body.app textarea{max-width:100%}
+body.app .code-row{flex-wrap:nowrap}
+body.app .code-row input{min-width:0}
+body.app pre,body.app code{white-space:pre-wrap;word-break:break-word}
+body.app p,body.app li,body.app dd,body.app b,body.app span{overflow-wrap:anywhere}
+/* janelas (modal) sempre à largura do ecrã, sem deslizar para o lado */
+body.app .modal{padding:8px}
+body.app .modal .box{max-width:calc(100vw - 16px);overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y}
+body.app .modal .mbody{overflow-x:hidden}
+body.app #modal .chips{flex-wrap:wrap;overflow:visible}
+body.app #modal .chip{flex:0 0 auto}
+body.app .chip input.sr,body.app .look-map input,body.app .cover-opt input{position:absolute;left:0;top:0;width:1px;height:1px}
+body.app .chip,body.app .look-map,body.app .cover-opt{position:relative}
+
+/* espaçamentos: uma só escala (4 · 8 · 12 · 16 · 24) */
+body.app{--a-s1:4px;--a-s2:8px;--a-s3:12px;--a-s4:16px;--a-s5:24px}
+body.app .a-pad{padding:var(--a-s4)}
+body.app .a-sec{margin:var(--a-s5) 0 0;padding:0 var(--a-s4)}
+body.app .a-sec>h2,body.app .a-h2{margin:0 0 var(--a-s3)}
+body.app .a-menu{margin:var(--a-s3) 0 var(--a-s4)}
+body.app .a-list{display:grid;gap:var(--a-s2)}
+body.app .a-panel,body.app .panel{padding:var(--a-s4);border-radius:16px}
+body.app .acc-sec{margin:0 0 var(--a-s5);padding:0}
+body.app .acc-sec>h2{margin:0 0 var(--a-s2)}
+body.app .mt{margin-top:var(--a-s4)}
+body.app .mt-s{margin-top:var(--a-s2)}
+body.app .mb{margin-bottom:var(--a-s4)}
+body.app .form{gap:var(--a-s3)}
+body.app .a-big-btn+.a-big-btn{margin-top:var(--a-s2)}
+body.app .a-actions{display:grid;gap:var(--a-s2);margin-top:var(--a-s4)}
+
+/* sininho na barra de cima */
+body.app .a-bar-bell{position:relative;margin-left:auto}
+body.app .a-bar-bell+.a-bar-btn{margin-left:0}
+body.app .a-bar-bell .count{position:absolute;top:2px;right:0;min-width:17px;height:17px;border-radius:999px;background:var(--pera);color:var(--folha);font-size:.7rem;font-weight:700;display:grid;place-items:center;padding:0 4px}
+
+/* Cooperativa em destaque */
+body.app .a-coop{display:grid;grid-template-columns:auto 1fr auto;gap:var(--a-s3);align-items:center;text-decoration:none;color:var(--folha);background:linear-gradient(120deg,var(--pera-l),#FFF3D2);border:1.5px solid var(--pera);border-radius:18px;padding:var(--a-s3) var(--a-s4)}
+body.app .a-coop span{display:grid;gap:2px;line-height:1.3}
+body.app .a-coop b{font-size:1.05rem}
+body.app .a-coop.on{background:#EEF6E2;border-color:#CFE2B4}
+body.app .a-coop-star{width:44px;height:44px;border-radius:14px;background:var(--campo);color:var(--pera);display:grid;place-items:center;font-size:1.5rem}
+body.app .a-coop-cta{background:var(--campo);color:#fff;border-radius:999px;padding:.35em .9em;font-weight:700;font-size:.9rem}
+body.app .coop-star{font-size:.6em;vertical-align:.3em}
+body.app .a-profile .coop-star{font-size:.75em;vertical-align:.1em}
+body.app .coop-upsell{grid-template-columns:auto 1fr}
+body.app .coop-upsell .link{grid-column:2}
+body.app .a-boxdel .box-got{gap:4px 10px}
+body.app .fp-summary{grid-template-columns:1fr}
+body.app .fp-summary .btn{grid-column:1}

@@ -73,7 +73,7 @@ function farmerArea(u) {
       ${sm.n ? `${stars(Math.round(sm.avg))} <span class="small">${numFmt(round2(sm.avg))} (${sm.n} ${sm.n === 1 ? T('avaliação', 'review') : T('avaliações', 'reviews')})</span>${sm.comments.filter(c => c.comment).map(c => `<p class="small mt-s">«${esc(c.comment)}» ${stars(c.rating)}</p>`).join('')}` : `<span class="small muted">${harvestRateOpen(d) ? T('As avaliações dos participantes aparecem aqui.', 'Participants\' reviews show here.') : T('Sem avaliações.', 'No reviews.')}</span>`}</div></li>`; };
   return `
   <section class="acc-sec"><div class="row-between mb-s"><h2>${T('Perfil da quinta', 'Farm profile')}</h2>${f ? `<a class="link" href="${farmerHref(f)}">${T('Ver a minha página pública', 'See my public page')}</a>` : ''}</div>
-    ${farmProfileForm(u, f, story)}</section>
+    ${fpEditing ? farmProfileForm(u, f, story) : farmProfileSummary(u, f)}</section>
   <section class="acc-sec"><h2>${T('Os meus produtos', 'My produce')}</h2>
     ${mine.length ? `<p class="muted mt-s mb-s">${T('Marque um produto como fora de stock quando não tiver colheita para a semana. O preço é acordado com a Daqui.', 'Mark a product as out of stock when you have no harvest for the week. Prices are agreed with Daqui.')}</p>
       <ul class="prodlist">${mine.map(p => { const my = myOffers(p, f.id), out = my.every(o => o.outOfStock), others = offersOf(p).filter(o => o.farmer !== f.id).map(o => F(o.farmer)).filter(Boolean);
@@ -116,11 +116,20 @@ function farmerArea(u) {
         <div class="row"><div class="field"><label for="pd-date">${T('Data', 'Date')}</label><input id="pd-date" type="date" min="${iso(today())}" required></div>${timeFields('pd')}</div>
         <div class="row"><div class="field"><label for="pd-prod">${T('Produto a colher', 'Produce to pick')}</label>${mine.length ? `<select id="pd-prod">${mine.map(p => `<option value="${p.id}">${esc(L(p.name))}</option>`).join('')}</select>` : `<input id="pd-prod" required>`}</div><div class="field"><label for="pd-spots">${T('Máximo de participantes', 'Maximum participants')}</label><input id="pd-spots" type="number" min="1" value="25" required></div></div>
         <p class="err" hidden></p><button class="btn btn-green btn-sm" type="submit">${T('Enviar proposta', 'Send proposal')}</button></form></details></section>
-  ${f ? lotsSection(f, mine) : ''}`;
+  ${f ? lotsSection(f, mine) : ''}
+  ${f ? farmerPaySection(f) : ''}`;
 }
 
 /* ---------- perfil da quinta: região, posição no mapa, "agricultor desde" e foto de capa ---------- */
-let fpDraft = null;   // { region, lat, lon, cover, coverFile } enquanto se edita (sobrevive a redesenhar a página)
+let fpDraft = null, fpEditing = false;
+/* perfil da quinta: resumo fechado; só se altera depois de carregar em "Editar" (e a posição no mapa só depois de "Mudar a posição") */
+function farmProfileSummary(u, f) {
+  const pt = u.partner, me = f || { id: '_eu', name: u.name, farm: pt.farm, place: pt.place, region: pt.region || 'aveiro', seed: 0, crop: 'pera' };
+  return `<div class="fp-summary"><div class="fp-cover">${farmPic(me)}</div>
+    <dl class="dl"><div><dt>${T('Quinta', 'Farm')}</dt><dd>${esc(me.farm || '')}</dd></div><div><dt>${T('Localidade', 'Town')}</dt><dd>${esc(me.place || '')}</dd></div>
+      <div><dt>${T('Região', 'Region')}</dt><dd>${regionName(me.region || pt.region || 'aveiro')}</dd></div><div><dt>${T('Agricultor desde', 'Farming since')}</dt><dd>${(f && f.since) || pt.since || '–'}</dd></div></dl>
+    <button class="btn btn-line btn-sm c-campo" data-fp-edit>${icon('gear', 16)} ${T('Editar perfil da quinta', 'Edit farm profile')}</button></div>`;
+}   // { region, lat, lon, cover, coverFile } enquanto se edita (sobrevive a redesenhar a página)
 function fpState(f, pt) {
   if (!fpDraft) fpDraft = { region: (f && f.region) || pt.region || 'aveiro', lat: f ? f.lat : null, lon: f ? f.lon : null, cover: (f && f.cover) || '', coverUrl: '' };
   if (fpDraft.lat == null) { const c = REGION_CENTER[fpDraft.region] || REGION_CENTER.aveiro; fpDraft.lat = c[0]; fpDraft.lon = c[1]; }
@@ -138,15 +147,15 @@ function farmProfileForm(u, f, story) {
       <div class="fp-two">
         <fieldset class="plain"><legend class="lbl">${T('Posição no mapa de Portugal', 'Position on the map of Portugal')}</legend>
           <p class="small muted">${T('Toque no mapa onde fica a quinta. Para as ilhas, toque no quadro da Madeira ou dos Açores.', 'Tap the map where your farm is. For the islands, tap the Madeira or Azores box.')}</p>
-          <div class="pin-pick" data-pin-pick>${portugalMapSVG(others.concat(me), lang, me.id)}</div>
-          <p class="small muted">${numFmt(round2(st.lat))}, ${numFmt(round2(st.lon))}</p></fieldset>
+          <div class="pin-pick${st.pinOn ? ' on' : ''}" ${st.pinOn ? 'data-pin-pick' : ''}>${portugalMapSVG(others.concat(me), lang, me.id)}</div>
+          ${st.pinOn ? `<p class="small c-campo">${icon('crosshair', 14)} ${T('Toque no mapa para mudar a posição.', 'Tap the map to move the pin.')}</p>` : `<button type="button" class="btn btn-line btn-sm mt-s" data-fp-pin>${icon('pin', 16)} ${T('Mudar a posição no mapa', 'Move the pin on the map')}</button>`}</fieldset>
         <fieldset class="plain"><legend class="lbl">${T('Foto de capa', 'Cover picture')}</legend>
           <div class="cover-now">${farmPic(me)}</div>
           <div class="cover-opts">${covers}</div>
           <label class="btn btn-line btn-sm c-campo mt-s">${icon('camera', 16)} ${T('Carregar uma fotografia', 'Upload a photo')}<input type="file" id="fp-photo" accept="image/*" class="sr" data-fp-photo></label>
           ${st.coverUrl || (st.cover && !/^art:/.test(st.cover)) ? `<p class="small">${T('Vai ser usada a sua fotografia.', 'Your photo will be used.')}</p>` : ''}</fieldset>
       </div>
-      <p class="err" hidden></p><button class="btn btn-green btn-sm" type="submit">${T('Guardar perfil', 'Save profile')}</button></form>`;
+      <p class="err" hidden></p><div class="row-btns"><button class="btn btn-green btn-sm" type="submit">${T('Guardar perfil', 'Save profile')}</button><button type="button" class="btn btn-line btn-sm" data-fp-cancel>${T('Cancelar', 'Cancel')}</button></div></form>`;
 }
 /* toque no mapa: converte o ponto do desenho em latitude/longitude (continente, quadro da Madeira ou dos Açores) */
 function mapPointToGeo(svg, ev) {
@@ -210,7 +219,8 @@ function restaurantArea(u) {
       <div class="row"><div class="field"><label for="rp-dpt">${T('Prato da semana (português)', 'Dish of the week (Portuguese)')}</label><input id="rp-dpt" value="${v('dish', 'pt')}" required></div><div class="field"><label for="rp-den">${T('Prato da semana (inglês)', 'Dish of the week (English)')}</label><input id="rp-den" value="${v('dish', 'en')}" required></div></div>
       <div class="row-gap"><label class="switch sm"><input type="checkbox" id="rp-veg"${src.dishVeg ? ' checked' : ''}>${T('Vegetariano', 'Vegetarian')}</label><label class="switch sm"><input type="checkbox" id="rp-vegan"${src.dishVegan ? ' checked' : ''}>Vegan</label></div>
       <p class="small muted">${T('Dica: diga de que quinta vem o ingrediente, por exemplo "com couve da Família Pereira".', 'Tip: say which farm the ingredient comes from, e.g. "with the Pereira family\'s kale".')}</p>
-      <p class="err" hidden></p><button class="btn btn-green btn-sm" type="submit">${T('Publicar', 'Publish')}</button></form></section>
+      <p class="err" hidden></p><button class="btn btn-green btn-sm" type="submit">${T('Publicar', 'Publish')}</button></form>
+    ${r ? restPinBlock(r) : ''}</section>
   <section class="acc-sec"><h2>${T('Pratos do menu com produtos Daqui', 'Menu dishes with Daqui produce')}</h2>
     ${dishes.length ? `<ul class="hlist mt-s">${dishes.map((x, i) => `<li class="hrow"><span>${icon('utensils', 20)}</span><div><b>${esc(x.pt)}</b> ${vegBadges(x, true)}<br><span class="small muted">${esc(x.en)}</span></div><button class="link" data-dish-rm="${i}">${T('Remover', 'Remove')}</button></li>`).join('')}</ul>` : `<p class="muted mt-s">${T('Ainda não acrescentou pratos.', 'No dishes added yet.')}</p>`}
     <form class="form mt" data-dish-add novalidate><div class="row"><div class="field"><label for="ds-pt">${T('Prato (português)', 'Dish (Portuguese)')}</label><input id="ds-pt" required></div><div class="field"><label for="ds-en">${T('Prato (inglês)', 'Dish (English)')}</label><input id="ds-en" required></div></div>
@@ -221,6 +231,22 @@ function restaurantArea(u) {
     <div class="row-btns mt-s"><a class="btn btn-green btn-sm" href="${href('produtos')}">${T('Ir à loja', 'Go to the shop')}</a><a class="btn btn-line btn-sm c-campo" href="${href('conta', 'sec=encomendas')}">${T('Histórico de encomendas', 'Order history')}</a></div></section>`;
 }
 
+/* posição do restaurante no mapa de Aveiro: só muda depois de carregar em "Mudar a posição" */
+let rpPin = null;   // { lat, lon } enquanto se escolhe
+function restPinBlock(r) {
+  const cur = rpPin || { lat: r.lat, lon: r.lon }, me = Object.assign({}, r, cur);
+  return `<h3 class="mt">${T('Posição no mapa', 'Position on the map')}</h3>
+    <div class="pin-pick av${rpPin ? ' on' : ''}" data-no-pz ${rpPin ? 'data-rest-pick' : ''}>${aveiroMapSVG(RESTAURANTS.filter(x => x.id !== r.id).concat(me), lang, r.id, { drawn: !rpPin && false })}</div>
+    ${rpPin ? `<p class="small c-campo">${icon('crosshair', 14)} ${T('Toque no mapa onde fica o restaurante.', 'Tap the map where the restaurant is.')}</p>
+      <div class="row-btns mt-s"><button class="btn btn-green btn-sm" data-rest-pin-save>${T('Guardar posição', 'Save position')}</button><button class="btn btn-line btn-sm" data-rest-pin-cancel>${T('Cancelar', 'Cancel')}</button></div>`
+      : `<button type="button" class="btn btn-line btn-sm mt-s" data-rest-pin>${icon('pin', 16)} ${T('Mudar a posição no mapa', 'Move the pin on the map')}</button>`}`;
+}
+document.addEventListener('click', e => {
+  const box = e.target.closest('[data-rest-pick]'); if (!box || !rpPin) return;
+  e.preventDefault(); e.stopPropagation(); const svg = box.querySelector('svg'), m = svg.getScreenCTM(); if (!m) return;
+  const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const { x, y } = pt.matrixTransform(m.inverse());
+  rpPin = { lat: +(40.652 - y / 548 * 0.026).toFixed(5), lon: +(x / 640 * 0.040 - 8.672).toFixed(5) }; rerenderKeep('[data-rest-pick]');
+}, true);
 function saveRest(u, patch) {
   const pt = u.partner;
   if (pt.restId) saveCatalog(ch => { ch.restaurants = ch.restaurants || {}; ch.restaurants[pt.restId] = Object.assign(ch.restaurants[pt.restId] || {}, patch); });
@@ -228,6 +254,9 @@ function saveRest(u, patch) {
 }
 PAGE_EVENTS.click.push((e, t, d) => {
   if (PAGE !== 'parceiro') return; const u = currentUser(); if (!u || !u.partner) return;
+  if ('restPin' in d) { const r = RESTAURANTS.find(x => x.id === u.partner.restId); rpPin = { lat: r.lat, lon: r.lon }; rerenderKeep('[data-rest-pick]'); return true; }
+  if ('restPinCancel' in d) { rpPin = null; rerenderKeep('[data-rest-pin]'); return true; }
+  if ('restPinSave' in d) { if (rpPin) { saveRest(u, { lat: rpPin.lat, lon: rpPin.lon }); rpPin = null; toast(T('Posição do restaurante guardada', 'Restaurant position saved')); rerenderKeep('[data-rest-pin]'); } return true; }
   if (d.myStock) { const p = P(d.myStock), fid = u.partner.farmerId, v = !myOffers(p, fid).every(o => o.outOfStock); setMyStock(p, fid, v); toast(v ? T(`${L(p.name)}: fora de stock`, `${L(p.name)}: out of stock`) : T(`${L(p.name)}: com stock`, `${L(p.name)}: in stock`)); rerenderKeep(`[data-my-stock="${p.id}"]`); return true; }
   if (d.leaveProd) { const p = P(d.leaveProd), others = offersOf(p).filter(o => o.farmer !== u.partner.farmerId).length;
     openModal(`<div class="mbody"><h2>${T('Deixar de vender', 'Stop selling')} ${esc(L(p.name))}?</h2>
@@ -239,6 +268,9 @@ PAGE_EVENTS.click.push((e, t, d) => {
   if ('ppPhotoRm' in d) { setPPPhoto(null); rerenderKeep('#pp-icon'); return true; }
   if ('newProdToggle' in d) { showNewProd = !showNewProd; rerenderKeep('[data-new-prod-toggle]'); return true; }
   if (d.editDayOpen) { editDay = d.editDayOpen; rerenderKeep('#ed-date'); return true; }
+  if ('fpEdit' in d) { fpEditing = true; fpDraft = null; rerenderKeep('#fp-farm'); return true; }
+  if ('fpCancel' in d) { fpEditing = false; fpDraft = null; rerenderKeep('[data-fp-edit]'); return true; }
+  if ('fpPin' in d) { if (fpDraft) fpDraft.pinOn = true; const keep = ['fp-farm', 'fp-place', 'fp-since', 'fp-spt', 'fp-sen'].map(id => [id, $('#' + id)?.value]); rerenderKeep('[data-pin-pick]'); keep.forEach(([id, v]) => { if ($('#' + id) && v != null) $('#' + id).value = v; }); return true; }
   if (d.lotEdit) { lotEdit = d.lotEdit; rerenderKeep('#le-qty'); return true; }
   if ('lotCancel' in d) { lotEdit = ''; rerenderKeep(); return true; }
   if (d.lotDel) { const l = LOTS.find(x => x.id === d.lotDel); if (!l || l.sold > 0) return true;
@@ -275,7 +307,7 @@ PAGE_EVENTS.submit.push((e, f) => {
       if (cover !== undefined) patch.cover = cover;
       u.partner.farm = patch.farm; u.partner.place = patch.place; u.partner.story = patch.story; u.partner.region = patch.region; if (since) u.partner.since = since; saveUsers();
       if (u.partner.farmerId) saveCatalog(ch => { ch.farmers = ch.farmers || {}; ch.farmers[u.partner.farmerId] = Object.assign(ch.farmers[u.partner.farmerId] || {}, patch); });
-      fpDraft = null; done(T('Perfil guardado', 'Profile saved'));
+      fpDraft = null; fpEditing = false; done(T('Perfil guardado', 'Profile saved'));
     };
     if (st.coverFile) { const btn = $('button[type="submit"]', f); btn.disabled = true;
       (NUVEM.on ? NUVEM.uploadPhoto(st.coverFile, 'jpg', 'produtos') : blobToDataURL(st.coverFile)).then(url => finish(url), () => { btn.disabled = false; toast(T('Não foi possível enviar a fotografia.', 'Could not upload the photo.')); });

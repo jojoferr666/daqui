@@ -19,7 +19,7 @@ farmers_block = data[data.index('const FARMERS'):data.index('];', data.index('co
 farmers = re.findall(r"\{ id:'([a-z0-9-]+)', name:'([^']+)'", farmers_block)
 
 # muda a cada versão: obriga o navegador a ir buscar os ficheiros novos (e não misturar com os antigos em cache)
-APP_VERSAO = '2026-11-23-v11'
+APP_VERSAO = '2026-11-23-v12'
 SCRIPTS = ['art', 'data', 'alteracoes', 'catalogo', 'analises', 'supabase-config', 'nuvem', 'auth', 'dados', 'app', 'pages-loja', 'pages-info', 'pages-conta', 'pages-gestao', 'pages-gestao2', 'pages-parceiro', 'textos', 'faturas', 'pages-extra']
 FONTS = 'https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Marcellus&display=swap'
 

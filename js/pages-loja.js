@@ -11,26 +11,32 @@ PAGES.inicio = () => {
   const html = `
   <section class="hero wrap" aria-label="${T('Destaques', 'Highlights')}">
     <div class="slider" data-tone="green" aria-roledescription="carousel"><div class="slides">
-      <div class="slide s-green on-dark on" data-tone="green" aria-roledescription="slide" aria-label="1 / 3">
+      <div class="slide s-green on-dark on" data-tone="green" aria-roledescription="slide" aria-label="1 / 4">
         <div><h1>${T('Do campo para a sua casa.', 'From the field to your door.')}</h1>
           <p>${T('Fruta e legumes de agricultores portugueses, com a quinta e a data de colheita em cada produto. Levante sem custo ou receba em casa.', 'Fruit and vegetables from Portuguese farmers, with the farm and harvest date on every product. Pick up for free or have it delivered.')}</p>
           <div class="ctas"><a class="btn btn-gold" href="${href('produtos')}">${T('Ver produtos', 'Browse the shop')}</a><a class="btn btn-line c-pera" href="${href('subscricao')}">${T('Conhecer a subscrição', 'See subscriptions')}</a></div></div>
         <div class="art">${crateSVG('mista')}<span class="string"></span>${otag(P('pera-rocha'), true)}</div>
       </div>
-      <div class="slide s-gold" data-tone="gold" aria-roledescription="slide" aria-label="2 / 3">
+      <div class="slide s-gold" data-tone="gold" aria-roledescription="slide" aria-label="2 / 4">
         <div><h1>${T('Descobertas da Estação', 'Seasonal Discoveries')}</h1>
           <p>${T('Uma caixa por semana, quinzena ou mês, com os seus favoritos e um produto da época para experimentar. O preço fica garantido durante 12 meses.', 'A box every week, fortnight or month, with your favourites and one seasonal product to try. Your price is guaranteed for 12 months.')}</p>
           <div class="ctas"><a class="btn btn-green" href="${href('subscricao')}">${T('Escolher a minha caixa', 'Choose my box')}</a></div></div>
         <div class="art">${crateSVG('fruta')}</div>
       </div>
-      <div class="slide s-sage" data-tone="sage" aria-roledescription="slide" aria-label="3 / 3">
+      <div class="slide s-green on-dark coop-slide" data-tone="green" aria-roledescription="slide" aria-label="3 / 4">
+        <div><h1>${T('Junta-te à Cooperativa', 'Join the Co-op')}</h1>
+          <p>${T(`Por ${money(SETTINGS.coopFee)} por ano não paga portes em nenhuma encomenda, tem prioridade no Colhe Connosco e vota nas decisões da Daqui.`, `For ${money(SETTINGS.coopFee)} a year you never pay delivery, get Join the Harvest priority and vote on Daqui's decisions.`)}</p>
+          <div class="ctas"><a class="btn btn-gold" href="${href('cooperativa')}">${T('Ver as vantagens', 'See the benefits')}</a><button class="btn btn-line c-pera" data-coop-pay>${T('Juntar-me já', 'Join now')}</button></div></div>
+        <div class="art coop-art">${coopHeroSVG()}</div>
+      </div>
+      <div class="slide s-sage" data-tone="sage" aria-roledescription="slide" aria-label="4 / 4">
         <div><h1>${T('Prefere encomendar por telefone?', 'Rather order by phone?')}</h1>
           <p>${T('Fale com uma pessoa da nossa equipa, que o ajuda a escolher. Entregamos num dia fixo da semana, sem precisar de aplicação.', 'Talk to someone on our team who will help you choose. We deliver on a fixed day each week, no app needed.')}</p>
           <span class="phone-big">${PHONE}</span><p class="small muted mt-s">${T('Segunda a sexta, 9h–18h. Sábado, 9h–13h.', 'Monday to Friday, 9 am–6 pm. Saturday, 9 am–1 pm.')}</p></div>
         <div class="art">${phoneSVG()}</div>
       </div></div>
       <div class="slider-ui"><button class="arr" data-slide-prev aria-label="${T('Destaque anterior', 'Previous slide')}">${icon('chevL', 18)}</button>
-        <div class="dots">${[0, 1, 2].map(i => `<button data-slide="${i}" aria-label="${T('Destaque', 'Slide')} ${i + 1}"${i === 0 ? ' aria-current="true"' : ''}></button>`).join('')}</div>
+        <div class="dots">${[0, 1, 2, 3].map(i => `<button data-slide="${i}" aria-label="${T('Destaque', 'Slide')} ${i + 1}"${i === 0 ? ' aria-current="true"' : ''}></button>`).join('')}</div>
         <button class="arr" data-slide-next aria-label="${T('Destaque seguinte', 'Next slide')}">${icon('chevR', 18)}</button></div>
     </div>
   </section>
@@ -506,6 +512,7 @@ function coSummary() {
     <dl class="dl">${priceLines(q, co.deliver)}
       <div><dt>${T('Dia', 'Day')}</dt><dd>${slotLabel(co.slot)}</dd></div><div class="tot"><dt>Total</dt><dd>${money(q.total)}</dd></div>
       ${q.balanceUsed ? `<div class="disc"><dt>${T('Pago com o Saldo Daqui', 'Paid with your Daqui balance')}</dt><dd>-${money(q.balanceUsed)}</dd></div><div class="tot"><dt>${T('A pagar', 'To pay')}</dt><dd>${money(q.toPay)}</dd></div>` : ''}</dl>
+    ${coopUpsell(q.ship.fee)}
     <p class="small muted">${T('As caixas de cartão Daqui (5 kg 0,85 €; 10 kg 1,00 €) são descontadas na encomenda seguinte quando as devolve.', 'Daqui cardboard boxes (5 kg €0.85; 10 kg €1.00) are refunded on your next order when you return them.')}</p>`;
 }
 PAGES.finalizar = () => {
@@ -646,6 +653,7 @@ async function placeOrder(o) {
   if (o.balance && u) { if (balanceOf(u) < o.balance) { giveBackLocal(o.lots); throw new Error('saldo'); } addMovLocal(u, { kind: 'compra', desc: 'Encomenda ' + o.num, value: o.total, balance: -o.balance, method: 'saldo', ref: o.num }); }
   if (o.promo && u) { const c = claimOf(u, o.promo); if (c) { c.used = nowISO(); c.order = o.num; store.set(CLAIMS_KEY, CLAIMS); } }
   ORDERS.push(o); saveOrders();
+  notifyAdminsLocal(T(`Nova encomenda ${o.num}`, `New order ${o.num}`), `${o.name}, ${money(o.total)}, ${fdate(parseISO(o.slot))}.`, 'conta?tab=encomendas');
   if (u) pushNotifLocal(u.username, T(`Encomenda ${o.num} recebida`, `Order ${o.num} received`), T(`Entrega: ${fdate(parseISO(o.slot), { weekday: 'long' })}.`, `Delivery: ${fdate(parseISO(o.slot), { weekday: 'long' })}.`), 'conta?sec=encomendas');
 }
 /* depois de adicionar ao cabaz na página de produto: seguir para o checkout ou continuar a comprar */

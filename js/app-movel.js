@@ -42,7 +42,7 @@ const roleOf = (u = currentUser()) => (!u ? 'cliente' : u.role === 'admin' ? 'ad
 const roleHome = (u = currentUser()) => ({ cliente: 'inicio', agricultor: 'p/produtos', restaurante: 'r/perfil', admin: 'g/pedidos' }[roleOf(u)]);
 const TABS = () => ({
   cliente: [['inicio', 'home', T('Início', 'Home')], ['loja', 'basket', T('Loja', 'Shop')], ['mapa', 'map', T('Mapa', 'Map')], ['conta', 'user', T('Conta', 'Account')]],
-  agricultor: [['p/produtos', 'leaf', T('Produtos', 'Produce')], ['p/entregas', 'truck', T('Entregas', 'Supplies')], ['p/colhe', 'sprout', T('Colhe', 'Harvest')], ['p/propostas', 'inbox', T('Propostas', 'Proposals')], ['p/conta', 'user', T('Conta', 'Account')]],
+  agricultor: [['p/produtos', 'leaf', T('Produtos', 'Produce')], ['p/entregas', 'truck', T('Entregas', 'Supplies')], ['p/colhe', 'sprout', T('Colhe', 'Harvest')], ['p/conta', 'user', T('Conta', 'Account')]],
   restaurante: [['r/perfil', 'utensils', T('Perfil', 'Profile')], ['r/pratos', 'list', T('Pratos', 'Dishes')], ['loja', 'basket', T('Loja', 'Shop')], ['r/conta', 'user', T('Conta', 'Account')]],
   admin: [['g/pedidos', 'inbox', T('Pedidos', 'Requests')], ['g/encomendas', 'box', T('Encomendas', 'Orders')], ['g/catalogo', 'leaf', T('Catálogo', 'Catalogue')], ['g/mais', 'menu', T('Mais', 'More')]]
 });
@@ -81,7 +81,7 @@ function askPosition() {
 const greeting = () => { const h = new Date().getHours(); return h < 13 ? T('Bom dia', 'Good morning') : h < 20 ? T('Boa tarde', 'Good afternoon') : T('Boa noite', 'Good evening'); };
 const myOrders = u => ORDERS.filter(o => (u ? o.user === u.username : !o.user)).sort((a, b) => String(b.created).localeCompare(String(a.created)));
 const pickupHours = day => (DISTRIBUTION.days[day] || {}).pickup || '';
-const canSwipe = o => o.deliver === 'pickup' && o.status !== 'cancelada' && orderStage(o) === 2;
+const canSwipe = o => o.deliver === 'pickup' && o.status !== 'cancelada' && orderStage(o) === 3;
 const sec = (title, body, extra = '') => `<section class="a-sec"><div class="a-sec-h"><h2>${title}</h2>${extra}</div>${body}</section>`;
 
 /* ---------- cartões ---------- */
@@ -107,9 +107,9 @@ function orderMini(o) {
   const st = orderStage(o);
   return `<a class="a-order" href="#/encomenda/${o.num}"><span class="a-order-ic">${icon(o.deliver === 'home' ? 'truck' : 'store', 22)}</span>
     <span><b>${o.num}</b><span class="muted small">${slotLabel(o.slot)}${o.deliver === 'pickup' ? `, ${esc(o.point)}` : ''}</span></span>
-    <span class="status ${st === 4 ? 'pausada' : st === 3 ? 'ativa' : 'prog'}">${stageName(o)}</span></a>`;
+    <span class="status ${stageCls(st)}">${stageName(o)}</span></a>`;
 }
-function stepsBar(o) { const st = orderStage(o); if (st === 4) return ''; return `<div class="a-steps" aria-hidden="true">${[0, 1, 2, 3].map(i => `<i class="${i <= st ? 'on' : ''}"></i>`).join('')}</div>`; }
+function stepsBar(o) { const st = orderStage(o); if (st === STAGE_CANCEL) return ''; return `<div class="a-steps" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => `<i class="${i <= st ? 'on' : ''}"></i>`).join('')}</div>`; }
 
 /* ---------- ecrãs próprios da app ---------- */
 function scrIntro() {
@@ -136,7 +136,7 @@ function nextRailDots() {
   r.addEventListener('scroll', upd, { passive: true }); upd();
 }
 function scrInicio(u) {
-  const orders = myOrders(u).filter(o => orderStage(o) < 3), next = orders.sort((a, b) => a.slot.localeCompare(b.slot))[0];
+  const orders = myOrders(u).filter(o => orderStage(o) < STAGE_DONE), next = orders.sort((a, b) => a.slot.localeCompare(b.slot))[0];
   /* todas as subscrições (ativas e em pausa): desliza-se entre elas no cartão do topo */
   const subs = u ? (u.subs || []).filter(s => s.status === 'ativa' || s.status === 'pausada').sort((a, b) => (a.status === 'ativa' ? 0 : 1) - (b.status === 'ativa' ? 0 : 1)) : [];
   const days = next ? Math.max(0, Math.round((parseISO(next.slot) - today()) / 864e5)) : null;
@@ -161,8 +161,9 @@ function scrInicio(u) {
   const season = favs.length ? favs : PRODUCTS.filter(p => p.cat !== 'caixas' && p.essential && available(p)).slice(0, 8);
   return { title: T('Início', 'Home'), hero: true, html: `
     <header class="a-hero"><div class="a-hero-in"><img src="${LOGO_GOLD}" alt="Daqui" class="a-hero-logo"><div class="a-hero-actions">${appBell(u)}</div></div>
-      <h1>${greeting()}${u ? ', ' + esc(u.name.split(' ')[0]) : ''}</h1><p>${T('Fruta e legumes da época, do campo para si.', 'Seasonal fruit and veg, from the field to you.')}</p></header>
+      <h1>${greeting()}${u ? ', ' + esc(u.name.split(' ')[0]) + memberStar(u) : ''}</h1><p>${T('Fruta e legumes da época, do campo para si.', 'Seasonal fruit and veg, from the field to you.')}</p></header>
     <div class="a-pad a-next-wrap">${nextCard}</div>
+    ${coopAppCard(u)}
     ${sec(T('Caixas da semana', 'This week\'s boxes'), `<div class="a-rail">${boxes.map(boxCard).join('')}</div>`, `<a class="link small" href="#/caixas">${T('Subscrever', 'Subscribe')}</a>`)}
     ${sec(T('Perto de si', 'Near you'), `<div class="a-list">${near.map(p => `<a class="a-row" href="#/mapa?v=recolha"><span class="a-row-ic">${icon('store', 20)}</span><span><b>${esc(p.name)}</b><span class="muted small">${T('Ponto de recolha', 'Collection point')}, ${T('qui.', 'Thu')} ${pickupHours('qui')}, ${T('sáb.', 'Sat')} ${pickupHours('sab')}</span></span><span class="a-km">${fmtKm(p.km)}</span></a>`).join('')}
       ${rests.map(r => `<a class="a-row" href="#/mapa?v=restaurantes"><span class="a-row-ic gold">${icon('utensils', 20)}</span><span><b>${esc(r.name)}</b><span class="muted small">${esc(L(r.dish))}</span></span><span class="a-km">${fmtKm(r.km)}</span></a>`).join('')}</div>
@@ -251,7 +252,7 @@ function scrMapa() {
   let body = '';
   if (mapaV === 'recolha') body = `<div class="a-list">${pickupList().map(p => `<div class="a-row"><span class="a-row-ic">${icon('store', 20)}</span><span><b>${esc(p.name)}</b><span class="muted small">${T('Quinta-feira', 'Thursday')} ${pickupHours('qui')}, ${T('sábado', 'Saturday')} ${pickupHours('sab')}</span></span><span class="a-km">${fmtKm(p.km)}</span></div>`).join('')}</div>
     <p class="small muted mt-s">${T('Escolhe o ponto de recolha ao finalizar a encomenda ou na subscrição.', 'You choose the collection point at checkout or in your subscription.')}</p>`;
-  if (mapaV === 'restaurantes') body = `${appCuisineChips()}<div class="a-map">${aveiroMapSVG(restList().filter(appRestOk).map(r => Object.assign({}, r, { href: '#/restaurante/' + r.id })), lang, '')}</div><div class="a-list">${restList().filter(appRestOk).map(r => `<div class="a-row" id="${r.id}" tabindex="-1"><span class="a-row-ic gold">${icon('utensils', 20)}</span><span><b>${esc(r.name)}</b><span class="muted small">${esc(cuisineName(r))}. ${esc(L(r.dish))} ${vegBadges({ veg: r.dishVeg, vegan: r.dishVegan }, true)}</span></span><span class="a-km">${fmtKm(r.km)}</span><a class="a-row-link" href="#/restaurante/${r.id}" aria-label="${T('Ver', 'See')} ${esc(r.name)}">${icon('chevR', 18)}</a></div>`).join('')}</div>`;
+  if (mapaV === 'restaurantes') body = `${appCuisineChips()}<div class="a-map">${aveiroMapSVG(restList().filter(appRestOk).map(r => Object.assign({}, r, { href: '#/restaurante/' + r.id })), lang, '')}</div><div class="a-list">${restList().filter(appRestOk).map(r => `<a class="a-row" id="${r.id}" href="#/restaurante/${r.id}"><span class="a-row-ic gold">${icon('utensils', 20)}</span><span><b>${esc(r.name)}</b><span class="muted small">${esc(cuisineName(r))}. ${esc(L(r.dish))} ${vegBadges({ veg: r.dishVeg, vegan: r.dishVegan }, true)}</span></span><span class="a-km">${fmtKm(r.km)}</span></a>`).join('')}</div>`;
   if (mapaV === 'quintas') body = `${appRegionChips()}<div class="a-map pt">${portugalMapSVG(farmersForMap().filter(f => appRegion === 'all' || f.region === appRegion), lang, '')}</div><div class="a-list">${farmList().filter(f => appRegion === 'all' || f.region === appRegion).map(f => `<a class="a-row" href="${farmerHref(f)}"><span class="a-row-ic">${icon('tractor', 20)}</span><span><b>${esc(f.farm)}</b><span class="muted small">${esc(f.name)}, ${esc(f.place)}</span></span><span class="a-km">${fmtKm(f.km)}</span></a>`).join('')}</div>`;
   return { title: T('Mapa', 'Map'), fab: true, html: `<div class="a-sticky"><div class="a-seg" role="tablist">${views.map(([k, n]) => `<button role="tab" data-mapa="${k}" aria-selected="${mapaV === k}">${n}</button>`).join('')}</div></div>
     <div class="a-pad">${appPos ? `<p class="small muted mb-s">${icon('locate', 14)} ${T('Distâncias a partir da sua localização.', 'Distances from your location.')} <button class="link" data-app-locate>${T('Atualizar', 'Update')}</button></p>` : `<button class="a-locate mb-s" data-app-locate>${icon('locate', 18)}${T('Usar a minha localização', 'Use my location')}</button><p class="small muted mb-s">${T('Sem localização, as distâncias contam a partir do centro de Aveiro.', 'Without your location, distances are from Aveiro city centre.')}</p>`}${body}</div>` };
@@ -281,9 +282,10 @@ function scrConta(u) {
   const orders = myOrders(u), nova = (u.subs || []).find(s => s.id === QS.get('nova'));
   return { title: T('Conta', 'Account'), fab: roleOf(u) === 'cliente', html: `<div class="a-pad">
     ${nova ? `<p class="note done">${icon('check', 22)}<span><b>${T('Subscrição confirmada', 'Subscription confirmed')}: ${esc(L(P(nova.box).name))}.</b> ${T('Primeira entrega', 'First delivery')}: ${slotLabel(nova.first)}.</span></p>` : ''}
-    <div class="a-profile"><span class="a-avatar">${esc(u.name.split(' ').map(x => x[0]).slice(0, 2).join(''))}</span><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.username)}, ${esc(u.phone)}</span></span></div>
+    <div class="a-profile"><span class="a-avatar">${esc(u.name.split(' ').map(x => x[0]).slice(0, 2).join(''))}</span><span><b>${esc(u.name)}${memberStar(u)}</b><span class="muted small">${esc(u.username)}, ${esc(u.phone)}</span></span></div>
+    ${coopAppCard(u)}
     ${rows([['#/conta/encomendas', 'box', T('Encomendas', 'Orders'), `${orders.length} ${orders.length === 1 ? T('encomenda', 'order') : T('encomendas', 'orders')}${(n => n ? `, ${n} ${n === 1 ? T('registo do Colhe Connosco', 'harvest record') : T('registos do Colhe Connosco', 'harvest records')}` : '')(harvestRecords(u).length)}`], ['#/conta/subscricoes', 'repeat', T('Subscrições', 'Subscriptions'), (n => `${n} ${n === 1 ? T('ativa', 'active') : T('ativas', 'active')}`)((u.subs || []).filter(s => s.status === 'ativa').length)],
-      ['#/conta/preferencias', 'heart', T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), `${(u.favs || []).length} ${(u.favs || []).length === 1 ? T('favorito', 'favourite') : T('favoritos', 'favourites')}, ${(u.exclude || []).length} ${T('excluídos', 'excluded')}, ${(u.notify || []).length} ${(u.notify || []).length === 1 ? T('aviso', 'reminder') : T('avisos', 'reminders')}`], ['#/conta/colhe', 'sprout', JTH(), (n => `${n} ${n === 1 ? T('inscrição', 'sign-up') : T('inscrições', 'sign-ups')}`)((u.harvests || []).length)], ['#/conta/carteira', 'wallet', T('Saldo e Cooperativa', 'Balance and Co-op'), `${money(balanceOf(u))}${isMember(u) ? ' · ' + T('membro', 'member') : ''}`], ['#/conta/faturas', 'receipt', T('Faturas', 'Invoices'), T('Ver e descarregar em PDF', 'View and download as PDF')], ['#/conta/dados', 'user', T('Dados e morada', 'Details and address'), T('E-mail, telemóvel, NIF e palavra-passe', 'Email, mobile, tax number and password')]])}
+      ['#/conta/preferencias', 'heart', T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), `${(u.favs || []).length} ${(u.favs || []).length === 1 ? T('favorito', 'favourite') : T('favoritos', 'favourites')}, ${(u.exclude || []).length} ${T('excluídos', 'excluded')}, ${(u.notify || []).length} ${(u.notify || []).length === 1 ? T('aviso', 'reminder') : T('avisos', 'reminders')}`], ['#/conta/colhe', 'sprout', JTH(), (n => `${n} ${n === 1 ? T('inscrição', 'sign-up') : T('inscrições', 'sign-ups')}`)((u.harvests || []).length)], ['#/conta/carteira', 'wallet', T('Saldo e Cooperativa', 'Balance and Co-op'), `${money(balanceOf(u))}${isMember(u) ? ' · ' + T('membro', 'member') : ''}`], ['#/conta/faturas', 'receipt', T('Faturas', 'Invoices'), T('Ver e descarregar em PDF', 'View and download as PDF')], ['#/conta/avaliacoes', 'star', T('As minhas avaliações', 'My reviews'), T('Editar ou apagar', 'Edit or delete')], ['#/conta/dados', 'user', T('Dados e morada', 'Details and address'), T('E-mail, telemóvel, NIF e palavra-passe', 'Email, mobile, tax number and password')]])}
     <div class="a-menu">${langRow}</div>${help}
     <button class="a-big-btn ghost danger" data-logout>${icon('logout', 18)} ${T('Terminar sessão', 'Sign out')}</button></div>` };
 }
@@ -295,7 +297,7 @@ function recMini({ h, d, rec }, u) {
     <b class="a-order-tot">${rec.price != null ? money(rec.price) : ''}</b></a>`;
 }
 function scrEncomendas(u) {
-  const list = myOrders(u).map(o => ({ at: String(o.created), html: orderMini(o) })).concat(u ? harvestRecords(u).map(x => ({ at: x.d.date, html: recMini(x, u) })) : []).sort((a, b) => b.at.localeCompare(a.at));
+  const list = myOrders(u).map(o => ({ at: String(o.created), html: orderMini(o) })).concat(u ? harvestRecords(u).map(x => ({ at: x.d.date, html: recMini(x, u) })) : [], subDeliveries(u).map(x => ({ at: x.date, html: boxDeliveryCard(x, true) }))).sort((a, b) => b.at.localeCompare(a.at));
   return { title: T('Encomendas', 'Orders'), back: true, html: `<div class="a-pad">${list.length ? `<div class="a-list">${list.map(x => x.html).join('')}</div>` : `<div class="a-empty">${icon('box', 30)}<p>${T('Ainda não fez encomendas.', 'No orders yet.')}</p><a class="btn btn-green" href="#/loja">${T('Ir à loja', 'Go to the shop')}</a></div>`}
     <p class="small muted mt">${T('Procura uma encomenda feita sem conta?', 'Looking for an order placed without an account?')} <button class="link" data-help="track">${T('Procurar com o número', 'Find it by number')}</button></p></div>` };
 }
@@ -308,13 +310,13 @@ function scrEncomenda(num, u) {
     ${nova ? `<div class="a-done">${icon('check', 34)}<h2>${T('Encomenda confirmada', 'Order confirmed')}</h2><p class="muted">${T('Guarde o número para seguir ou alterar a encomenda.', 'Keep the number to track or change the order.')}</p></div>` : ''}
     ${canSwipe(o) ? `<div class="a-swipe-box"><p><b>${T('A sua encomenda está pronta', 'Your order is ready')}</b><br><span class="small">${esc(o.point)}, ${pickupHours(o.day)}. ${T('Deslize quando a receber no ponto de recolha.', 'Swipe when you receive it at the collection point.')}</span></p>
       <div class="a-swipe" data-swipe="${o.num}"><span class="a-swipe-label">${T('Deslize para confirmar o levantamento', 'Swipe to confirm collection')}</span><button class="a-swipe-knob" data-swipe-knob="${o.num}" aria-label="${T('Confirmar o levantamento', 'Confirm collection')}">${icon('chevR', 26)}</button></div></div>` : ''}
-    ${st === 3 && o.deliver === 'pickup' ? `<p class="note done">${icon('check', 22)}<span><b>${T('Levantada', 'Collected')}.</b> ${T('Bom proveito!', 'Enjoy!')}</span></p>` : ''}
+    ${st === STAGE_DONE && o.deliver === 'pickup' ? `<p class="note done">${icon('check', 22)}<span><b>${T('Levantada', 'Collected')}.</b> ${T('Bom proveito!', 'Enjoy!')}</span></p>` : ''}
     <div class="a-panel">${trackHTML(o)}</div>
     <div class="a-panel"><h2 class="a-h2">${T('Artigos', 'Items')}</h2><div class="a-items">${o.items.map(i => { const p = P(i.id); return `<div class="a-item"><span class="thumb">${p ? artFor(p) : ''}</span><span>${itemText(i)}</span><b>${money(round2(i.price * i.qty))}</b></div>`; }).join('')}</div>
       <div class="sum"><span>${T('Entrega', 'Delivery')}</span><span>${o.fee ? money(o.fee) : T('Grátis', 'Free')}</span></div><div class="sum tot"><span>Total</span><span>${money(o.total)}</span></div>
       ${o.prefs ? `<p class="small muted mt-s">${T('Nas caixas não vai', 'Boxes will leave out')}: ${(o.prefs.exclude || []).map(P).filter(Boolean).map(p => esc(L(p.name))).join(', ') || T('nada', 'nothing')}.</p>` : ''}</div>
-    <div class="a-actions">${st === 0 && o.status !== 'cancelada' ? `<button class="a-big-btn ghost" data-app-manage="${o.num}">${icon('calendar', 18)} ${T('Mudar o dia ou cancelar', 'Change the day or cancel')}</button>` : ''}
-      ${st >= 2 && st < 4 ? `<a class="a-big-btn ghost" href="#/incidencia/${o.num}">${icon('camera', 18)} ${T('Comunicar um problema', 'Report a problem')}</a>` : ''}
+    <div class="a-actions">${st <= 1 && o.status !== 'cancelada' ? `<button class="a-big-btn ghost" data-app-manage="${o.num}">${icon('calendar', 18)} ${T('Mudar o dia ou cancelar', 'Change the day or cancel')}</button>` : ''}
+      ${st >= 3 && st <= STAGE_DONE ? `<a class="a-big-btn ghost" href="#/incidencia/${o.num}">${icon('camera', 18)} ${T('Comunicar um problema', 'Report a problem')}</a>` : ''}
       <button class="a-big-btn ghost" data-app-reorder="${o.num}">${icon('repeat', 18)} ${T('Repetir encomenda', 'Order again')}</button>
       ${nova ? `<a class="a-big-btn" href="#/inicio">${T('Voltar ao início', 'Back to home')}</a>` : ''}</div></div>` };
 }
@@ -352,7 +354,7 @@ function myProposals(u) {
   return `<section class="acc-sec"><h2>${T('As minhas propostas e pedidos', 'My proposals and requests')}</h2>${list.length ? `<ul class="hlist mt-s">${list.map(r => `<li class="hrow"><span>${icon(r.type === 'produto' ? 'leaf' : r.type === 'colhe' ? 'calendar' : r.type === 'frio' ? 'snow' : 'inbox', 20)}</span><div><b>${types[r.type] || r.type}</b><br><span class="small muted">${esc(r.fields.productId && P(r.fields.productId) ? L(P(r.fields.productId).name) : r.fields.namePt || (P(r.fields.product) ? L(P(r.fields.product).name) : r.fields.product) || (r.fields.date ? slotLabel(r.fields.date) : '') || r.fields.farm || r.fields.restaurant || '')}${r.fields.organic ? ` (${bioName(r.fields.organic === 'sim').toLowerCase()})` : ''} · ${fdate(r.created)}</span>${reqReply(r)}</div>${reqStatus(r)}</li>`).join('')}</ul>` : `<p class="muted mt-s">${T('Ainda não fez propostas.', 'No proposals yet.')}</p>`}</section>`;
 }
 function adminMais() {
-  const kp = `<div class="kpis"><div><strong>${REQUESTS.filter(r => r.status === 'novo').length}</strong><span>${T('pedidos novos', 'new requests')}</span></div><div><strong>${ORDERS.filter(o => orderStage(o) < 3).length}</strong><span>${T('por entregar', 'to deliver')}</span></div><div><strong>${Object.values(USERS).flatMap(c => c.subs || []).filter(s => s.status === 'ativa').length}</strong><span>${T('subscrições', 'subscriptions')}</span></div><div><strong>${Object.values(USERS).filter(x => x.role !== 'admin').length}</strong><span>${T('contas', 'accounts')}</span></div></div>`;
+  const kp = `<div class="kpis"><div><strong>${REQUESTS.filter(r => r.status === 'novo').length}</strong><span>${T('pedidos novos', 'new requests')}</span></div><div><strong>${ORDERS.filter(o => orderStage(o) < STAGE_DONE).length}</strong><span>${T('por entregar', 'to deliver')}</span></div><div><strong>${Object.values(USERS).flatMap(c => c.subs || []).filter(s => s.status === 'ativa').length}</strong><span>${T('subscrições', 'subscriptions')}</span></div><div><strong>${Object.values(USERS).filter(x => x.role !== 'admin').length}</strong><span>${T('contas', 'accounts')}</span></div></div>`;
   const nm = chatUnread();
   const rows = [['#/g/mensagens', 'chat', T('Mensagens', 'Messages') + (nm ? ` <span class="count-in">${nm}</span>` : '')], ['#/g/preparar', 'box', T('Preparar caixas', 'Prepare boxes')], ['#/g/inventario', 'list', T('Inventário', 'Inventory')],
     ['#/g/promocoes', 'gift', T('Promoções e códigos', 'Promotions and codes')], ['#/g/parceiros', 'tractor', T('Agricultores e restaurantes', 'Farmers and restaurants')], ['#/g/definicoes', 'gear', T('Definições da loja', 'Shop settings')], ['#/g/caixas', 'box', T('Caixas e preços', 'Boxes and prices')], ['#/g/colhe', 'sprout', JTH()], ['#/g/subscricoes', 'repeat', T('Subscrições', 'Subscriptions')], ['#/g/contas', 'users', T('Contas', 'Accounts')], ['#/conta/dados', 'lock', T('Dados e palavra-passe', 'Details and password')], ['#/g/dados', 'app', NUVEM.on ? T('Base de dados', 'Database') : T('Guardar alterações', 'Save changes')]];
@@ -362,7 +364,7 @@ function adminMais() {
     <button class="a-big-btn ghost danger" data-logout>${icon('logout', 18)} ${T('Terminar sessão', 'Sign out')}</button></div>`;
 }
 function partnerConta(u, extra) {
-  return `<div class="a-profile"><span class="a-avatar">${esc(u.name.split(' ').map(x => x[0]).slice(0, 2).join(''))}</span><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.username)}, ${esc(u.phone)}</span></span></div>
+  return `<div class="a-profile"><span class="a-avatar">${esc(u.name.split(' ').map(x => x[0]).slice(0, 2).join(''))}</span><span><b>${esc(u.name)}${memberStar(u)}</b><span class="muted small">${esc(u.username)}, ${esc(u.phone)}</span></span></div>
     ${extra}${contaSection('dados')}
     <div class="a-menu">${settingsRow()}${NATIVO.pushAvailable() && false ? `<button class="a-row" data-push-on><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${NATIVO.pushState === 'on' ? T('Ativas neste telemóvel', 'On for this phone') : T('Toque para ativar', 'Tap to turn on')}</span></span>${icon('chevR', 18)}</button>` : ''}
       <a class="a-row" href="#/conta/encomendas"><span class="a-row-ic">${icon('box', 20)}</span><span><b>${T('Encomendas', 'Orders')}</b></span>${icon('chevR', 18)}</a></div>
@@ -382,7 +384,7 @@ function appScreen(path, u) {
   if (a === 'mapa') { if (QS.get('v')) mapaV = QS.get('v'); return scrMapa(); }
   if (a === 'conta' && !b) return scrConta(u);
   if (a === 'conta' && b === 'encomendas') return scrEncomendas(u);
-  if (a === 'conta') { if (!u) return { redirect: 'entrar?next=conta' }; BACK = /^subscricao\/[a-z0-9-]+$/.test(QS.get('voltar') || '') ? QS.get('voltar') : ''; const names = { carteira: T('Saldo e Cooperativa', 'Balance and Co-op'), faturas: T('Faturas', 'Invoices'), subscricoes: T('Subscrições', 'Subscriptions'), preferencias: T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), colhe: JTH(), dados: role === 'admin' ? T('Dados e palavra-passe', 'Details and password') : T('Dados e morada', 'Details and address') };
+  if (a === 'conta') { if (!u) return { redirect: 'entrar?next=conta' }; BACK = /^subscricao\/[a-z0-9-]+$/.test(QS.get('voltar') || '') ? QS.get('voltar') : ''; const names = { carteira: T('Saldo e Cooperativa', 'Balance and Co-op'), faturas: T('Faturas', 'Invoices'), avaliacoes: T('As minhas avaliações', 'My reviews'), subscricoes: T('Subscrições', 'Subscriptions'), preferencias: T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), colhe: JTH(), dados: role === 'admin' ? T('Dados e palavra-passe', 'Details and password') : T('Dados e morada', 'Details and address') };
     return { title: names[b] || T('Conta', 'Account'), back: true, html: `<div class="a-pad">${contaSection(b) || ''}</div>` }; }
   if (a === 'mensagens') return role === 'admin' ? { redirect: 'g/mensagens' } : scrMensagens(u);
   if (a === 'definicoes') return scrDefinicoes(u);
@@ -403,8 +405,10 @@ function appScreen(path, u) {
   /* agricultor */
   if (path === 'p/produtos') return { title: T('Os meus produtos', 'My produce'), html: `<div class="a-pad">${partnerTab(u, [1])}</div>` };
   if (path === 'p/colhe') return { title: JTH(), html: `<div class="a-pad">${partnerTab(u, [2])}</div>` };
-  if (path === 'p/propostas') return { title: T('Propostas', 'Proposals'), html: `<div class="a-pad">${myProposals(u)}</div>` };
-  if (path === 'p/conta') return { title: T('Conta', 'Account'), html: `<div class="a-pad">${partnerConta(u, partnerTab(u, [0]))}</div>` };
+  if (path === 'p/propostas') return { title: T('Propostas', 'Proposals'), back: true, html: `<div class="a-pad">${myProposals(u)}</div>` };
+  if (path === 'p/conta') return { title: T('Conta', 'Account'), html: `<div class="a-pad">${partnerConta(u, farmerContaRows(u))}</div>` };
+  if (path === 'p/perfil') return { title: T('Perfil da quinta', 'Farm profile'), back: true, html: `<div class="a-pad">${partnerTab(u, [0])}</div>` };
+  if (path === 'p/pagamentos') { const f = u.partner.farmerId ? F(u.partner.farmerId) : null; return { title: T('Vendas e pagamentos', 'Sales and payments'), back: true, html: `<div class="a-pad">${f ? farmerPaySection(f) : ''}</div>` }; }
   /* restaurante */
   if (path === 'r/perfil') return { title: esc(u.partner.name || T('Restaurante', 'Restaurant')), html: `<div class="a-pad">${partnerTab(u, [0, 1])}</div>` };
   if (path === 'r/pratos') return { title: T('Pratos', 'Dishes'), html: `<div class="a-pad">${partnerTab(u, [2])}</div>` };
@@ -436,7 +440,7 @@ render = function appRender() {
   const role = roleOf(u), tabs = TABS()[role], act = activeTab(path, role);
   const count = itemCount(cart), newReq = role === 'admin' ? REQUESTS.filter(r => r.status === 'novo').length : 0, newMsg = role === 'admin' ? chatUnread() : 0;
   const bar = scr.bare || scr.hero || scr.noBar ? '' : `<header class="a-bar"><div class="a-bar-in">${scr.back ? `<button class="a-bar-btn" data-app-back aria-label="${T('Voltar', 'Back')}">${icon('chevL', 26)}</button>` : `<img class="a-bar-logo" src="${LOGO_GOLD}" alt="Daqui">`}
-    <h1 class="a-bar-title">${scr.title}</h1>${role === 'admin' && path.startsWith('g/') ? `<button class="a-bar-btn" data-app-refresh aria-label="${T('Atualizar', 'Refresh')}">${icon('repeat', 22)}</button>` : ''}</div></header>`;
+    <h1 class="a-bar-title">${scr.title}</h1>${u && role !== 'cliente' && path !== 'notificacoes' ? appBarBell(u) : ''}${role === 'admin' && path.startsWith('g/') ? `<button class="a-bar-btn" data-app-refresh aria-label="${T('Atualizar', 'Refresh')}">${icon('repeat', 22)}</button>` : ''}</div></header>`;
   const nav = scr.bare ? '' : `<nav class="a-tabs" aria-label="${T('Secções', 'Sections')}">${tabs.map(([r, ic, n]) => `<a href="#/${r}"${act === r ? ' aria-current="page"' : ''}>${icon(ic, 24)}<span>${n}</span>${r === 'g/pedidos' && newReq ? `<i class="a-dot">${newReq}</i>` : ''}${r === 'g/mais' && newMsg ? `<i class="a-dot">${newMsg}</i>` : ''}</a>`).join('')}</nav>`;
   const fab = scr.fab && role !== 'admin' && role !== 'agricultor' ? `<button class="a-fab" data-cart-open aria-label="${T('Abrir cabaz', 'Open basket')}, ${count} ${T('artigos', 'items')}">${icon('basket', 26)}${count ? `<span class="count">${count}</span>` : ''}</button>` : '';
   $('#app').innerHTML = `${NUVEM.banner()}${bar}<main id="main" class="a-main${scr.hero ? ' has-hero' : ''}${scr.noBar ? ' no-bar' : ''}${scr.bare ? ' bare' : ''}" tabindex="-1">${scr.html}</main>${fab}${nav}`;
@@ -531,7 +535,7 @@ function setPhoto(blob) { if (incPhotoUrl) URL.revokeObjectURL(incPhotoUrl); inc
 /* deslizar para confirmar o levantamento */
 function confirmPickup(num) {
   const o = findOrder(num); if (!o || !canSwipe(o)) return;
-  o.stage = 3; saveOrders();
+  o.stage = STAGE_DONE; saveOrders();
   toast(T('Levantamento confirmado. Bom proveito!', 'Collection confirmed. Enjoy!')); rerenderKeep();
 }
 document.addEventListener('pointerdown', e => {
@@ -656,3 +660,15 @@ PAGE_EVENTS.click.push((e, t, d) => {
 PAGE_EVENTS.change.push((e, t) => {
   if (t.matches('[data-look-sound]')) { setLook({ sound: t.checked }); if (t.checked) playSound('notif'); return true; }
 });
+
+/* conta do agricultor: propostas, vendas e perfil da quinta ficam aqui (a barra de baixo tem só 4 separadores) */
+function farmerContaRows(u) {
+  const nProp = REQUESTS.filter(r => r.partnerUser === u.username && r.status === 'novo').length;
+  return `<div class="a-menu">
+    <a class="a-row" href="#/p/propostas"><span class="a-row-ic">${icon('inbox', 20)}</span><span><b>${T('Propostas e pedidos', 'Proposals and requests')}</b><span class="muted small">${nProp ? T(`${nProp} à espera de resposta`, `${nProp} awaiting reply`) : T('Produtos novos e outros pedidos à Daqui', 'New products and other requests to Daqui')}</span></span>${icon('chevR', 18)}</a>
+    <a class="a-row" href="#/p/pagamentos"><span class="a-row-ic">${icon('receipt', 20)}</span><span><b>${T('Vendas e pagamentos', 'Sales and payments')}</b><span class="muted small">${T('Notas de pagamento em PDF', 'Payment notes as PDF')}</span></span>${icon('chevR', 18)}</a>
+    <a class="a-row" href="#/p/perfil"><span class="a-row-ic">${icon('tractor', 20)}</span><span><b>${T('Perfil da quinta', 'Farm profile')}</b><span class="muted small">${T('Nome, região, posição no mapa e foto de capa', 'Name, region, map position and cover photo')}</span></span>${icon('chevR', 18)}</a></div>`;
+}
+
+/* sininho na barra de cima (gestão, agricultor e restaurante também recebem avisos) */
+function appBarBell(u) { const n = unreadNotifs(u); return `<a class="a-bar-btn a-bar-bell" href="#/notificacoes" aria-label="${T('Notificações', 'Notifications')}${n ? `, ${n} ${T('por ler', 'unread')}` : ''}">${icon('bell', 22)}${n ? `<span class="count">${n > 9 ? '9+' : n}</span>` : ''}</a>`; }
