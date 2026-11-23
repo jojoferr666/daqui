@@ -1244,3 +1244,12 @@ html.no-anim::view-transition-old(root),html.no-anim::view-transition-new(root){
 @media (max-width:1180px){ .nav a{padding:.85em .55em;font-size:.95rem} }
 .coop-star.big{font-size:.42em;vertical-align:.5em}
 @media (max-width:1080px) and (min-width:961px){ .nav a{padding:.85em .4em;font-size:.88rem} }
+/* v13: caixa a preparar (subscrição ou à unidade) */
+.prep-box{display:grid;gap:10px}
+.prep-box+.prep-box{border-top:1px dashed var(--line);padding-top:12px;margin-top:4px}
+.prep-box-h{align-items:center;gap:10px}
+.prep-box-h .thumb,.prep .row-gap>.thumb{width:44px;height:44px;flex:none}
+.prep-box>*{margin:0}
+.box-surprise .ic{vertical-align:-2px}
+.box-inside{margin-top:8px}
+.box-inside .lbl{margin:0 0 4px}

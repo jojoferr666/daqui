@@ -45,33 +45,41 @@ function tabPreparar() {
         ${(i.why || []).map(w => `<span class="tag">${whyTxt(w)}</span>`).join('')}${low ? `<span class="tag warn">${T('stock', 'stock')}: ${stockText(p, stockOf(p))}</span>` : ''}
         <button type="button" class="icon-btn" data-prep-rm="${id}|${k}" aria-label="${T('Tirar', 'Remove')}">${icon('close', 16)}</button></li>`; }).join('')}</ul>
     ${locked ? '' : `<button type="button" class="btn btn-line btn-sm" data-prep-add="${id}">${icon('plus', 14)} ${T('Produto', 'Product')}</button>`}`;
+  /* gostos do cliente para uma caixa: os da encomenda (guardados no momento da compra) ou os da conta */
+  const prefsLine = pr => !pr ? `<p class="small muted">${T('Cliente sem conta: sem preferências.', 'Guest customer: no preferences.')}</p>`
+    : (pr.favs || []).length || (pr.exclude || []).length ? `<p class="small muted">${(pr.favs || []).length ? `${icon('heart', 14)} ${(pr.favs || []).map(y => P(y) ? esc(L(P(y).name)) : '').filter(Boolean).slice(0, 8).join(', ')}` : ''}${(pr.exclude || []).length ? `${(pr.favs || []).length ? ' · ' : ''}${T('Prefere não receber', 'Rather not get')}: ${(pr.exclude || []).map(y => P(y) ? esc(L(P(y).name)) : '').filter(Boolean).join(', ')}` : ''}</p>`
+    : `<p class="small muted">${T('Sem favoritos nem exclusões.', 'No favourites or exclusions.')}</p>`;
+  /* uma caixa (de subscrição ou comprada à unidade): conteúdo editável, peso estimado e nova sugestão */
+  const boxBlock = (id, b, size, pr, items, locked, again, head) => {
+    const sz = (BOX_SIZES[b.id] || []).find(z => z.s === size), kg = round2(items.reduce((a, i) => a + itemKg({ id: i.id, qty: i.qty }), 0));
+    return `<div class="prep-box">${head || `<div class="row-gap prep-box-h"><span class="thumb">${artFor(b)}</span><span><b>${esc(L(b.name))}</b><br><span class="small muted">${sizeName(size)}${sz ? ` (${sz.kg} kg)` : ''}</span></span></div>`}
+      ${prefsLine(pr)}
+      ${itemsHTML(id, items, locked)}
+      <p class="small muted">${T('Peso estimado', 'Estimated weight')}: ${numFmt(kg)} kg${sz ? ` / ${sz.kg} kg` : ''}</p>
+      ${locked || !again ? '' : `<div class="row-btns"><button type="button" class="btn btn-line btn-sm" data-prep-again="${again}">${icon('repeat', 14)} ${T('Nova sugestão', 'New suggestion')}</button></div>`}</div>`;
+  };
   const draft = (id, box, size, u) => { const done = PREPS.find(p => p.id === id); if (!prepDraft[id]) prepDraft[id] = done ? done.items.map(x => Object.assign({}, x)) : suggestBox(box, size, u); return { done, items: prepDraft[id] }; };
   const stageTag = st => `<span class="status ${st >= 3 ? 'ativa' : st === 2 ? 'ativa' : 'prog'}">${[T('Por preparar', 'To prepare'), T('Por preparar', 'To prepare'), T('Preparada', 'Packed'), T('Em distribuição', 'Out for delivery'), T('Entregue', 'Delivered')][st] || ''}</span>`;
   const who = (name, un, extra) => `<div><b>${esc(name)}</b>${un ? ` <span class="small muted">(${esc(un)})</span>` : ''}<br><span class="small">${extra}</span></div>`;
   /* encomendas da loja: produtos (já escolhidos) e caixas compradas à unidade (conteúdo escolhido aqui) */
   const orderCard = o => {
-    const st = Math.min(orderStage(o), 4), locked = st >= 2, c = o.user ? USERS[o.user] : null;
+    const st = Math.min(orderStage(o), 4), locked = st >= 2, c = orderPrefs(o);
     const boxes = []; o.items.forEach((i, n) => { const p = P(i.id); if (p && p.cat === 'caixas') for (let k = 0; k < (i.qty || 1); k++) boxes.push({ id: `${o.num}-${n}-${k}`, p, size: i.size || (BOX_SIZES[p.id] || [{}])[0].s }); });
     const prods = o.items.filter(i => P(i.id) && P(i.id).cat !== 'caixas');
     return `<article class="panel prep${locked ? ' done' : ''}"><div class="row-between">${who(o.name, o.user, `${o.num} · ${o.deliver === 'home' ? T('entrega em casa', 'home delivery') + (o.window ? `, ${o.window}` : '') : esc(o.point || '')}`)}${stageTag(st)}</div>
       ${prods.length ? `<p class="lbl mt-s">${T('Produtos', 'Products')}</p><ul class="prep-items">${prods.map(i => `<li><span class="thumb sm">${artFor(P(i.id))}</span>${itemText(i)}</li>`).join('')}</ul>` : ''}
-      ${boxes.map(b => { const x = draft(b.id, b.p, b.size, c); return `<p class="lbl mt-s">${esc(L(b.p.name))}, ${sizeName(b.size)}</p>${itemsHTML(b.id, locked ? (x.done ? x.done.items : x.items) : x.items, locked)}`; }).join('')}
-      ${boxPrefs(o)}
+      ${boxes.map(b => { const x = draft(b.id, b.p, b.size, c); return boxBlock(b.id, b.p, b.size, c, locked ? (x.done ? x.done.items : x.items) : x.items, locked, `${b.id}|order|${o.num}`); }).join('')}
       <div class="row-btns mt-s">${locked ? (st === 2 ? `<button class="btn btn-line btn-sm" data-prep-order-undo="${o.num}">${T('Voltar a abrir', 'Reopen')}</button>` : '')
         : `<button class="btn btn-green btn-sm" data-prep-order="${o.num}">${icon('check', 16)} ${T('Marcar como preparada', 'Mark as packed')}</button>`}</div></article>`;
   };
   /* caixas das subscrições */
   const subCard = ({ c, s }) => {
     const b = P(s.box), id = `${s.id}-${ds}`, sz = (BOX_SIZES[s.box] || []).find(z => z.s === s.size), x = draft(id, b, s.size, c), st = x.done ? x.done.stage : 0, locked = !!x.done;
-    const kg = round2((locked ? x.done.items : x.items).reduce((a, i) => a + itemKg({ id: i.id, qty: i.qty }), 0));
+    const head = `<div class="row-between"><div class="row-gap"><span class="thumb">${artFor(b)}</span>${who(c.name, c.username, `${esc(L(b.name))}, ${sizeName(s.size)}${sz ? ` (${sz.kg} kg)` : ''} · ${s.deliver === 'home' ? T('entrega em casa', 'home delivery') : esc(s.point || T('ponto de recolha', 'pick-up point'))}`)}</div>${stageTag(st)}</div>`;
     return `<article class="panel prep${locked ? ' done' : ''}" data-prep="${id}">
-      <div class="row-between"><div class="row-gap"><span class="thumb">${artFor(b)}</span>${who(c.name, c.username, `${esc(L(b.name))}, ${sizeName(s.size)} (${sz ? sz.kg : s.kg} kg) · ${s.deliver === 'home' ? T('entrega em casa', 'home delivery') : esc(s.point || T('ponto de recolha', 'pick-up point'))}`)}</div>${stageTag(st)}</div>
-      ${(c.favs || []).length || (c.exclude || []).length ? `<p class="small muted mt-s">${(c.favs || []).length ? `${icon('heart', 14)} ${(c.favs || []).map(y => P(y) ? esc(L(P(y).name)) : '').filter(Boolean).slice(0, 8).join(', ')}` : ''}${(c.exclude || []).length ? ` · ${T('Prefere não receber', 'Rather not get')}: ${(c.exclude || []).map(y => P(y) ? esc(L(P(y).name)) : '').filter(Boolean).join(', ')}` : ''}</p>` : ''}
-      ${itemsHTML(id, locked ? x.done.items : x.items, locked)}
-      <p class="small muted">${T('Peso estimado', 'Estimated weight')}: ${numFmt(kg)} kg ${sz ? `/ ${sz.kg} kg` : ''}</p>
+      ${boxBlock(id, b, s.size, c, locked ? x.done.items : x.items, locked, `${id}|${s.id}|${c.username}`, head)}
       <div class="row-btns">${locked ? (st === 2 ? `<button class="btn btn-line btn-sm" data-prep-undo="${id}">${T('Voltar a abrir', 'Reopen')}</button>` : '')
-        : `<button class="btn btn-green btn-sm" data-prep-ok="${id}|${s.id}|${c.username}">${icon('check', 16)} ${T('Aceitar e preparar', 'Accept and prepare')}</button>
-           <button class="btn btn-line btn-sm" data-prep-again="${id}|${s.id}|${c.username}">${icon('repeat', 14)} ${T('Nova sugestão', 'New suggestion')}</button>`}</div></article>`;
+        : `<button class="btn btn-green btn-sm" data-prep-ok="${id}|${s.id}|${c.username}">${icon('check', 16)} ${T('Aceitar e preparar', 'Accept and prepare')}</button>`}</div></article>`;
   };
   const todoSubs = subs.filter(({ s }) => !prepOf(s.id, ds)).length, todoOrd = orders.filter(o => orderStage(o) < 2).length;
   const ready = orders.filter(o => orderStage(o) === 2).length + PREPS.filter(p => p.date === ds && p.stage === 2).length;
@@ -99,7 +107,7 @@ function acceptPrep(id, subId, un, extra) {
 function prepareOrder(num) {
   const o = findOrder(num); if (!o) return false;
   for (const [n, i] of o.items.entries()) { const p = P(i.id); if (!p || p.cat !== 'caixas') continue;
-    for (let k = 0; k < (i.qty || 1); k++) { const id = `${o.num}-${n}-${k}`; if (!prepDraft[id]) prepDraft[id] = suggestBox(p, i.size, o.user ? USERS[o.user] : null);
+    for (let k = 0; k < (i.qty || 1); k++) { const id = `${o.num}-${n}-${k}`; if (!prepDraft[id]) prepDraft[id] = suggestBox(p, i.size, orderPrefs(o));
       if (!acceptPrep(id, null, o.user, { date: o.slot, order: o.num, box: p.id, size: i.size || null, user: o.user && USERS[o.user] ? (NUVEM.on ? USERS[o.user]._id : o.user) : null })) return false; } }
   o.stage = 2; saveOrders(); notifyStageLocal(o); return true;
 }
@@ -118,7 +126,7 @@ function tabInventario() {
   return `<section class="acc-sec"><h2>${T('Inventário', 'Inventory')}</h2>
     <p class="muted mt-s">${T('Cada entrega de um agricultor é um lote com data de colheita. O stock é o que falta vender; as encomendas e as caixas preparadas tiram primeiro dos lotes mais antigos.', 'Each farmer supply is a batch with a harvest date. Stock is what is left to sell; orders and prepared boxes take from the oldest batches first.')}</p>
     <label class="switch mt-s"><input type="checkbox" data-lock-lots${SETTINGS.lockLots ? ' checked' : ''}>${T('Bloquear alterações dos agricultores ao peso e à data de colheita das entregas já submetidas', 'Lock farmers\' changes to the weight and harvest date of supplies already sent')}</label>
-    <div class="row-gap mt"><div class="field grow"><label for="inv-q">${T('Procurar produto', 'Search product')}</label><input id="inv-q" data-inv-q value="${esc(invQ)}" autocomplete="off"></div>
+    <div class="row-gap mt inv-filters"><div class="field grow"><label for="inv-q">${T('Procurar produto', 'Search product')}</label><input id="inv-q" data-inv-q value="${esc(invQ)}" autocomplete="off"></div>
       <div class="field"><label for="inv-f">${T('Agricultor', 'Farmer')}</label><select id="inv-f" data-inv-f><option value="">${T('Todos', 'All')}</option>${FARMERS.map(f => `<option value="${f.id}"${invFarmer === f.id ? ' selected' : ''}>${esc(f.name)}</option>`).join('')}</select></div></div>
     <h3 class="mt">${T('Stock por produto', 'Stock by product')}</h3>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>${T('Produto', 'Product')}</th><th>${T('Em stock', 'In stock')}</th><th>${T('Colheita mais recente', 'Latest harvest')}</th><th>${T('Lote mais antigo', 'Oldest batch')}</th><th>${T('Época', 'Season')}</th></tr></thead><tbody>
@@ -202,8 +210,15 @@ PAGE_EVENTS.click.push((e, t, d) => {
   if (d.bsDel) { const [id, i] = d.bsDel.split('|'); boxSizesEdit(id, l => l.splice(+i, 1)); rerenderKeep(); return true; }
   if (d.prepRm) { const [id, k] = d.prepRm.split('|'); (prepDraft[id] || []).splice(+k, 1); rerenderKeep(); return true; }
   if (d.prepAdd) { const id = d.prepAdd, have = new Set((prepDraft[id] || []).map(i => i.id)); const p = PRODUCTS.find(x => x.cat !== 'caixas' && available(x) && !have.has(x.id)); if (p) (prepDraft[id] = prepDraft[id] || []).push({ id: p.id, qty: byKg(p) ? 1 : 1, why: [] }); rerenderKeep(); return true; }
-  if (d.prepAgain) { const [id, sid, un] = d.prepAgain.split('|'), c = USERS[un], s = (c.subs || []).find(x => x.id === sid); const cur = (prepDraft[id] || []).map(i => i.id);
-    prepDraft[id] = suggestBox(P(s.box), s.size, c, cur.slice(0, 2)); rerenderKeep(); return true; }
+  /* nova sugestão: para uma caixa de subscrição (id|subscrição|cliente) ou comprada à unidade (id|order|número) */
+  if (d.prepAgain) { const [id, sid, ref] = d.prepAgain.split('|'), ids = (prepDraft[id] || []).map(i => i.id);
+    /* troca o que não é favorito (os favoritos ficam); se só houver favoritos, troca o último */
+    const favOf = pr => new Set((pr && pr.favs) || []), rot = pr => { const f = favOf(pr), nf = ids.filter(x => !f.has(x)); return nf.length ? nf : ids.slice(-1); };
+    const cur = sid === 'order' ? rot(orderPrefs(findOrder(ref) || { items: [] })) : rot(USERS[ref]);
+    if (sid === 'order') { const o = findOrder(ref), n = +id.split('-').slice(-2)[0], it = o && o.items[n]; if (!it) return true;
+      prepDraft[id] = suggestBox(P(it.id), it.size || (BOX_SIZES[it.id] || [{}])[0].s, orderPrefs(o), cur); }
+    else { const c = USERS[ref], s = c && (c.subs || []).find(x => x.id === sid); if (!s) return true; prepDraft[id] = suggestBox(P(s.box), s.size, c, cur); }
+    rerenderKeep(); return true; }
   if (d.prepOk) { const [id, sid, un] = d.prepOk.split('|'); if (acceptPrep(id, sid, un)) toast(T('Caixa preparada', 'Box prepared')); rerenderKeep(); return true; }
   if (d.prepAll) { const day = parseISO(d.prepAll); let n = 0;
     Object.values(USERS).forEach(c => (c.subs || []).filter(s => deliversOn(s, day) && !prepOf(s.id, d.prepAll)).forEach(s => { const id = `${s.id}-${d.prepAll}`; if (!prepDraft[id]) prepDraft[id] = suggestBox(P(s.box), s.size, c); if (acceptPrep(id, s.id, c.username)) n++; }));

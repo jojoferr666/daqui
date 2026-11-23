@@ -235,6 +235,19 @@ function suggestBox(box, size, u, exclude = []) {
   return pick.map(p => ({ id: p.id, qty: byKg(p) ? Math.min(per, stockOf(p)) : Math.max(1, Math.min(Math.round(per / (UNIT_KG[p.unit] || 0.5)), stockOf(p))), why: [favs.has(p.id) ? 'fav' : '', age(p) > 10 ? 'old' : '', seasonLeft(p) === 0 ? 'season' : ''].filter(Boolean) }));
 }
 
+/* gostos usados nas caixas de uma encomenda: os guardados no momento da compra; se não houver, os da conta; cliente sem conta: nenhum */
+function orderPrefs(o) {
+  if (o.prefs) return { favs: o.prefs.favs || [], exclude: o.prefs.exclude || [] };
+  const u = o.user && USERS[o.user]; return u ? { favs: u.favs || [], exclude: u.exclude || [] } : null;
+}
+/* caixas compradas à unidade, vistas pelo cliente: o conteúdo é surpresa até a encomenda ser entregue (como nas subscrições) */
+function orderBoxesHTML(o) {
+  const boxes = o.items.filter(i => P(i.id) && P(i.id).cat === 'caixas'); if (!boxes.length) return '';
+  const done = orderStage(o) === STAGE_DONE, preps = PREPS.filter(p => p.order === o.num);
+  if (!done || !preps.length) return `<p class="small muted box-surprise">${icon('gift', 14)} ${T('O conteúdo das caixas é surpresa: aparece aqui depois de entregue. Escolhemos a partir dos seus favoritos e nunca pomos o que prefere não receber.', 'What is inside the boxes is a surprise: it shows here once delivered. We pick from your favourites and never add what you would rather not get.')}</p>`;
+  return preps.map(x => { const b = P(x.box); return `<div class="box-inside"><p class="lbl">${b ? esc(L(b.name)) : T('Caixa', 'Box')}${x.size ? `, ${sizeName(x.size)}` : ''}</p><ul class="box-got">${x.items.map(i => P(i.id) ? `<li><span class="thumb sm">${artFor(P(i.id))}</span>${esc(L(P(i.id).name))} <span class="small muted">${byKg(P(i.id)) ? numFmt(i.qty) + ' kg' : numFmt(i.qty) + ' ' + unitWord(P(i.id).unit, i.qty)}</span></li>` : '').join('')}</ul></div>`; }).join('');
+}
+
 /* ---------- arranque sem base de dados ---------- */
 function loadLocalExtras() {
   loadLocalLots();

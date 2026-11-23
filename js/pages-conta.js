@@ -107,7 +107,7 @@ PAGES.conta = () => {
     return `<article class="ordcard"><div class="oc-thumbs">${o.items.slice(0, 3).map(i => P(i.id) ? `<span class="thumb">${artFor(P(i.id))}</span>` : '').join('')}</div>
       <div><div class="row-gap"><b>${o.num}</b><span class="status ${stageCls(st)}">${stageName(o)}</span></div>
         <p class="small muted">${T('Feita a', 'Placed on')} ${fdate(o.created, { day: 'numeric', month: 'long', year: 'numeric' })}. ${o.deliver === 'home' ? T('Entrega', 'Delivery') : T('Levantamento', 'Pick-up')}: ${slotLabel(o.slot)}.</p>
-        <p class="small">${esc(names.slice(0, 4).join(', '))}${names.length > 4 ? ` ${T('e mais', 'and')} ${names.length - 4}` : ''}</p></div>
+        <p class="small">${esc(names.slice(0, 4).join(', '))}${names.length > 4 ? ` ${T('e mais', 'and')} ${names.length - 4}` : ''}</p>${orderBoxesHTML(o)}</div>
       <div class="oc-side"><b>${money(o.total)}</b><a class="btn btn-line btn-sm c-campo" href="${href('contacto', 'encomenda=' + o.num)}">${T('Seguir', 'Track')}</a><button class="link small" data-reorder="${o.num}">${T('Repetir encomenda', 'Order again')}</button><button class="link small" data-invoice="order|${o.num}">${icon('receipt', 14)} ${T('Fatura', 'Invoice')}</button></div>${reviewPrompts(u, o)}</article>`; };
   /* registos do Colhe Connosco: aparecem nas encomendas, com o valor pago e o identificador */
   const recCard = ({ h, d, rec }) => { const f = F(d.farmer) || { farm: d.farmer, place: '' }, pr = dayProduct(d);

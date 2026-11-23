@@ -366,7 +366,7 @@ body.app .cat-tbl td{padding-left:96px}
 body.app .cat-tbl td .num{width:72px}
 body.app .cat-tbl td .num.pct{width:56px}
 body.app .cat-tbl td .sel.sm{max-width:86px}
-body.app .acc-sec{overflow-wrap:anywhere}
+body.app .acc-sec{overflow-wrap:break-word}
 body.app #main{overflow-x:clip}
 
 /* =====================================================================================
@@ -446,13 +446,13 @@ body.app img,body.app svg,body.app video,body.app canvas{max-width:100%}
 body.app .a-pad *{min-width:0}
 body.app .a-pad table{max-width:none}
 body.app .tbl-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
-body.app .row,body.app .row-gap,body.app .row-btns,body.app .chips,body.app .radios{flex-wrap:wrap}
+body.app .row,body.app .row-gap,body.app .row-btns,body.app .radios{flex-wrap:wrap}
 body.app .a-chips,body.app .a-rail{overscroll-behavior-x:contain}
 body.app input,body.app select,body.app textarea{max-width:100%}
 body.app .code-row{flex-wrap:nowrap}
 body.app .code-row input{min-width:0}
 body.app pre,body.app code{white-space:pre-wrap;word-break:break-word}
-body.app p,body.app li,body.app dd,body.app b,body.app span{overflow-wrap:anywhere}
+body.app p,body.app li,body.app dd,body.app b,body.app span{overflow-wrap:break-word}
 /* janelas (modal) sempre à largura do ecrã, sem deslizar para o lado */
 body.app .modal{padding:8px}
 body.app .modal .box{max-width:calc(100vw - 16px);overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y}
@@ -462,30 +462,13 @@ body.app #modal .chip{flex:0 0 auto}
 body.app .chip input.sr,body.app .look-map input,body.app .cover-opt input{position:absolute;left:0;top:0;width:1px;height:1px}
 body.app .chip,body.app .look-map,body.app .cover-opt{position:relative}
 
-/* espaçamentos: uma só escala (4 · 8 · 12 · 16 · 24) */
-body.app{--a-s1:4px;--a-s2:8px;--a-s3:12px;--a-s4:16px;--a-s5:24px}
-body.app .a-pad{padding:var(--a-s4)}
-body.app .a-sec{margin:var(--a-s5) 0 0;padding:0 var(--a-s4)}
-body.app .a-sec>h2,body.app .a-h2{margin:0 0 var(--a-s3)}
-body.app .a-menu{margin:var(--a-s3) 0 var(--a-s4)}
-body.app .a-list{display:grid;gap:var(--a-s2)}
-body.app .a-panel,body.app .panel{padding:var(--a-s4);border-radius:16px}
-body.app .acc-sec{margin:0 0 var(--a-s5);padding:0}
-body.app .acc-sec>h2{margin:0 0 var(--a-s2)}
-body.app .mt{margin-top:var(--a-s4)}
-body.app .mt-s{margin-top:var(--a-s2)}
-body.app .mb{margin-bottom:var(--a-s4)}
-body.app .form{gap:var(--a-s3)}
-body.app .a-big-btn+.a-big-btn{margin-top:var(--a-s2)}
-body.app .a-actions{display:grid;gap:var(--a-s2);margin-top:var(--a-s4)}
-
 /* sininho na barra de cima */
 body.app .a-bar-bell{position:relative;margin-left:auto}
 body.app .a-bar-bell+.a-bar-btn{margin-left:0}
 body.app .a-bar-bell .count{position:absolute;top:2px;right:0;min-width:17px;height:17px;border-radius:999px;background:var(--pera);color:var(--folha);font-size:.7rem;font-weight:700;display:grid;place-items:center;padding:0 4px}
 
 /* Cooperativa em destaque */
-body.app .a-coop{display:grid;grid-template-columns:auto 1fr auto;gap:var(--a-s3);align-items:center;text-decoration:none;color:var(--folha);background:linear-gradient(120deg,var(--pera-l),#FFF3D2);border:1.5px solid var(--pera);border-radius:18px;padding:var(--a-s3) var(--a-s4)}
+body.app .a-coop{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-decoration:none;color:var(--folha);background:linear-gradient(120deg,var(--pera-l),#FFF3D2);border:1.5px solid var(--pera);border-radius:18px;padding:14px 16px}
 body.app .a-coop span{display:grid;gap:2px;line-height:1.3}
 body.app .a-coop b{font-size:1.05rem}
 body.app .a-coop.on{background:#EEF6E2;border-color:#CFE2B4}
@@ -498,3 +481,97 @@ body.app .coop-upsell .link{grid-column:2}
 body.app .a-boxdel .box-got{gap:4px 10px}
 body.app .fp-summary{grid-template-columns:1fr}
 body.app .fp-summary .btn{grid-column:1}
+
+/* =====================================================================================
+   v13 (app): ESPAÇAMENTOS. Uma só regra para todos os ecrãs:
+   · margem do ecrã: 16 px de cada lado;
+   · entre blocos do ecrã (cartões, listas, botões): 16 px;
+   · dentro de um cartão: 16 px de margem interior e 12 px entre o que lá está;
+   · antes de um subtítulo: 24 px; entre o título e o texto que o explica: 4 px.
+   As margens próprias de cada elemento (mt, mb, etc.) deixam de contar dentro destas pilhas.
+   ===================================================================================== */
+body.app{--g:16px;--in:12px;--sec:24px;--rad:18px}
+body.app fieldset{min-width:0}
+body.app .a-pad{padding:var(--g) var(--g) 28px}
+body.app .wrap{padding-left:var(--g);padding-right:var(--g)}
+
+/* pilha do ecrã */
+body.app.app :where(.a-pad,.a-pad>div:not([class]),[data-site-page],.a-stack)>*{margin-top:0;margin-bottom:0}
+body.app.app :where(.a-pad,.a-pad>div:not([class]),[data-site-page],.a-stack)>*+*{margin-top:var(--g)}
+body.app .a-pad>.a-sec{padding:0}
+body.app .a-pad>:is(.a-h2,.a-menu-h){margin:var(--sec) 2px 0}
+body.app .a-pad>:is(.a-h2,.a-menu-h):first-child{margin-top:0}
+body.app .a-pad>:is(.a-h2,.a-menu-h)+*{margin-top:8px}
+body.app :is(.a-h2,.a-menu-h){font-family:var(--display);font-weight:400;font-size:1.25rem;line-height:1.2;color:var(--folha)}
+
+/* cartões: todos iguais */
+body.app :is(.acc-sec,.subflow fieldset,.subsum){background:var(--white);border:1px solid var(--line);border-radius:var(--rad);padding:var(--g);box-shadow:none}
+body.app .subflow fieldset{margin:0}
+body.app .a-panel{padding:var(--g);border-radius:var(--rad)}
+body.app .subform{display:grid;gap:var(--g)}
+body.app .subflow fieldset>legend{float:left;width:100%;padding:0;margin:0 0 var(--in);font-family:var(--display);font-size:1.3rem;display:flex;align-items:center;gap:10px}
+body.app .subflow fieldset>legend+*{clear:both}
+/* pilha dentro do cartão */
+body.app.app :where(.acc-sec,.panel,.subflow fieldset,.subsum>div)>*{margin-top:0;margin-bottom:0}
+body.app.app :where(.acc-sec,.panel,.subflow fieldset,.subsum>div)>*+*{margin-top:var(--in)}
+body.app :where(.acc-sec,.panel,.subflow fieldset)>:is(h2,h3,.lbl)+:is(p,.muted,.small){margin-top:4px}
+body.app :where(.acc-sec,.panel)>:is(h3,h4):not(:first-child){margin-top:var(--sec)}
+body.app .acc-sec>h2{font-size:1.4rem;line-height:1.2}
+body.app .acc-sec h3{font-size:1.15rem}
+/* cartão dentro de cartão: creme, sem sombra, um pouco mais justo */
+body.app .acc-sec :is(.panel,.pw-box,.prep){background:var(--paper);border-radius:14px;padding:14px;box-shadow:none}
+body.app .acc-sec .panel>summary{margin:0}
+body.app .acc-sec details.panel[open]>summary{margin-bottom:var(--in)}
+/* listas de cartões */
+body.app :is(.inbox,.prep-list,.a-cards-list){display:grid;gap:var(--in)}
+body.app .inbox>*{margin:0}
+body.app .a-list{gap:0}
+/* formulários */
+body.app .form{display:grid;gap:var(--in)}
+body.app .form>*{margin-top:0;margin-bottom:0}
+body.app .form .row{gap:var(--in)}
+body.app .field{gap:6px}
+body.app .range-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+body.app .row-btns,body.app .row-gap{gap:8px}
+/* filtros (chips) dentro de um cartão: em várias linhas, sem sair do cartão */
+body.app .acc-sec .chips{flex-wrap:wrap;overflow:visible;margin-left:0;margin-right:0;padding:0;gap:8px}
+/* números (KPI): 2 ou 3 por linha, sempre do mesmo tamanho */
+body.app .kpis{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0}
+body.app .kpis div{padding:10px 12px}
+/* menus e listas da app */
+body.app .a-menu{margin:0}
+body.app .a-profile{margin:0}
+body.app .a-big-btn{margin-top:0}
+body.app :where(.a-pad,[data-site-page])>.a-big-btn+.a-big-btn{margin-top:8px}
+body.app .a-big-btn.danger{margin-top:var(--sec)}
+body.app .a-actions{display:grid;gap:8px;margin:0}
+/* páginas do site dentro da app: título e corpo com as mesmas margens */
+body.app .page-head{padding-top:var(--g);padding-bottom:0}
+body.app .page-head+.wrap,body.app .page-head+section,body.app .page-head+div{margin-top:var(--g)}
+body.app .sec{padding:var(--sec) 0}
+/* tabelas convertidas em cartões */
+body.app table.a-cards tr{padding:8px 14px;margin-bottom:var(--in);border-radius:14px}
+body.app :is(.a-boxdel,.boxdel) p .ic,body.app :is(.a-boxdel,.boxdel) .link .ic{display:inline-block;vertical-align:-2px;margin-right:2px}
+body.app .a-boxdel .row-gap{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+body.app .a-boxdel .row-gap .status{margin-left:auto}
+body.app .a-boxdel>div:last-child{flex:1;display:grid;gap:4px}
+body.app .a-boxdel .oc-thumbs{align-self:flex-start}
+body.app .a-boxdel .thumb{width:40px;height:40px;border-radius:12px;background:var(--pera-l);display:grid;place-items:center;padding:5px}
+/* botões do agricultor (fora de stock / deixar de vender): cada um na sua largura, sem partir o texto */
+body.app .prodlist li>.prod-acts{flex-wrap:wrap}
+body.app .prodlist li>.prod-acts .btn{flex:0 1 auto;white-space:nowrap}
+/* filtros do inventário: um por linha */
+body.app .inv-filters,body.app .filters-row{display:grid;grid-template-columns:1fr;gap:var(--in)}
+body.app .prep>.row-btns{margin-top:var(--in)}
+body.app .prep-items li{flex-wrap:wrap;row-gap:6px}
+body.app .prep-items select{max-width:none;flex:1 1 160px}
+/* páginas do site dentro da app: o título (escondido) não deixa espaço vazio por cima */
+body.app [data-site-page]>.page-head:first-child,body.app [data-site-page]>.subhero:first-child{margin-top:0}
+body.app [data-site-page] .page-head h1+*,body.app [data-site-page] .page-head>div>h1+*{margin-top:0}
+body.app [data-site-page] .page-head{padding-top:var(--g)}
+/* filtros e campos dentro dos cartões: à largura toda, como nos formulários */
+body.app .acc-sec>.row-gap>:is(input,select,.sel){flex:1 1 100%;max-width:none;width:100%}
+body.app .acc-sec .field>:is(input,select,textarea){width:100%;max-width:none}
+body.app [data-site-page]>:first-child,body.app .a-pad>:first-child{margin-top:0}
+body.app [data-site-page] :is(.sec-tight,.farmer-hero){padding-top:var(--g);padding-bottom:var(--g)}
+body.app [data-site-page]>.crumbs+*{margin-top:0}

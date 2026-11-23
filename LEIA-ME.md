@@ -673,3 +673,11 @@ Base de dados: corra `supabase/10-encomendas-e-avisos.sql` (depois do 09; pode r
 - **Restaurantes:** a vinheta inteira abre a página do restaurante; cada restaurante muda a posição do seu pin no mapa (só dentro de Aveiro).
 - **Gravações mais seguras:** uma alteração feita enquanto os dados estão a ser relidos já não se perde.
 
+
+## 30. Versão 13: o que mudou
+
+Base de dados: nada a correr (o supabase/10 da versão 12 chega). A função `notificar` não muda.
+
+- **Espaçamentos da app iguais em todos os ecrãs:** 16 px de margem do ecrã e entre blocos; cartões com 16 px de margem interior e 12 px entre o que têm dentro; 24 px antes de cada subtítulo. Os títulos de secção têm todos o mesmo estilo. Corrigidos os cartões sem margem interior, a finalização da encomenda que saía para a direita e os botões do agricultor partidos em duas linhas.
+- **Caixas compradas à unidade iguais às das subscrições** em Gestão > Preparar caixas: imagem da caixa, gostos do cliente (os guardados no momento da compra), peso estimado e botão "Nova sugestão" (mantém os favoritos e troca o resto, nunca põe o que o cliente prefere não receber).
+- **O cliente só vê o conteúdo da caixa comprada à unidade depois de entregue** (como nas subscrições), na lista de encomendas, no seguimento e na app. A gestão vê o conteúdo em Encomendas logo que a caixa é preparada.

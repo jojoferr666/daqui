@@ -314,7 +314,7 @@ function scrEncomenda(num, u) {
     <div class="a-panel">${trackHTML(o)}</div>
     <div class="a-panel"><h2 class="a-h2">${T('Artigos', 'Items')}</h2><div class="a-items">${o.items.map(i => { const p = P(i.id); return `<div class="a-item"><span class="thumb">${p ? artFor(p) : ''}</span><span>${itemText(i)}</span><b>${money(round2(i.price * i.qty))}</b></div>`; }).join('')}</div>
       <div class="sum"><span>${T('Entrega', 'Delivery')}</span><span>${o.fee ? money(o.fee) : T('Grátis', 'Free')}</span></div><div class="sum tot"><span>Total</span><span>${money(o.total)}</span></div>
-      ${o.prefs ? `<p class="small muted mt-s">${T('Nas caixas não vai', 'Boxes will leave out')}: ${(o.prefs.exclude || []).map(P).filter(Boolean).map(p => esc(L(p.name))).join(', ') || T('nada', 'nothing')}.</p>` : ''}</div>
+      ${o.prefs ? `<p class="small muted mt-s">${T('Nas caixas não vai', 'Boxes will leave out')}: ${(o.prefs.exclude || []).map(P).filter(Boolean).map(p => esc(L(p.name))).join(', ') || T('nada', 'nothing')}.</p>` : ''}${orderBoxesHTML(o)}</div>
     <div class="a-actions">${st <= 1 && o.status !== 'cancelada' ? `<button class="a-big-btn ghost" data-app-manage="${o.num}">${icon('calendar', 18)} ${T('Mudar o dia ou cancelar', 'Change the day or cancel')}</button>` : ''}
       ${st >= 3 && st <= STAGE_DONE ? `<a class="a-big-btn ghost" href="#/incidencia/${o.num}">${icon('camera', 18)} ${T('Comunicar um problema', 'Report a problem')}</a>` : ''}
       <button class="a-big-btn ghost" data-app-reorder="${o.num}">${icon('repeat', 18)} ${T('Repetir encomenda', 'Order again')}</button>
@@ -606,7 +606,7 @@ function scrDefinicoes(u) {
     <h2 class="a-h2">${T('Aspeto', 'Appearance')}</h2>
     <div class="a-menu"><label class="a-row"><span class="a-row-ic">${icon('layers', 20)}</span><span><b>${T('Animações', 'Animations')}</b><span class="muted small">${T('Deslizar entre ecrãs e animação de abertura', 'Slide between screens and opening animation')}</span></span><input type="checkbox" class="a-switch" data-look-anim${LOOK.anim ? ' checked' : ''}></label>
       <label class="a-row"><span class="a-row-ic">${icon('sound', 20)}</span><span><b>${T('Sons', 'Sounds')}</b><span class="muted small">${T('Ao confirmar um levantamento e ao receber notificações', 'When confirming a pick-up and receiving notifications')}</span></span><input type="checkbox" class="a-switch" data-look-sound${LOOK.sound !== false ? ' checked' : ''}></label></div>
-    <p class="lbl mt">${T('Mapa dos restaurantes', 'Restaurants map')}</p>${lookMapChoices()}
+    <h2 class="a-h2">${T('Mapa dos restaurantes', 'Restaurants map')}</h2>${lookMapChoices()}
     <h2 class="a-h2">${T('Permissões da app', 'App permissions')}</h2>
     <div class="a-menu">
       <button class="a-row" data-perm="push"><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${T('Encomendas, promoções e lembretes', 'Orders, promotions and reminders')}</span></span>${st(pr.push)}</button>

@@ -269,7 +269,7 @@ function showOrder(kind, o, logIt) {
         <div class="field mt-s"><label for="o-slot">${T('Mudar o dia de entrega', 'Change the delivery day')}</label><select id="o-slot">${slots.map(x => `<option value="${x.date}|${x.day}">${slotLabel(x)}</option>`).join('')}</select></div>
         <div class="row-btns mt-s"><button class="btn btn-green btn-sm" data-ord-reslot="${o.num}">${T('Guardar novo dia', 'Save new day')}</button><button class="btn btn-line btn-sm c-tomato" data-ord-cancel="${o.num}">${T('Cancelar encomenda', 'Cancel order')}</button></div></div>`
     : st < STAGE_DONE ? `<p class="note mt">${icon('phone', 20)}<span>${T(`A encomenda já está preparada. Para alterações, ligue para o ${PHONE}.`, `The order is already being packed. For changes, call ${PHONE}.`)}</span></p>` : '';
-  openModal(`<div class="mbody">${trackHTML(o)}${manage}
+  openModal(`<div class="mbody">${trackHTML(o)}${orderBoxesHTML(o) ? `<div class="panel mt">${orderBoxesHTML(o)}</div>` : ''}${manage}
     ${st === STAGE_DONE ? `<p class="small muted mt">${T('Algum problema com esta encomenda?', 'Any problem with this order?')} <button class="link" data-help="issue" data-num="${o.num}">${T('Comunicar incidência', 'Report a problem')}</button></p>` : ''}</div>`, `${T('Encomenda', 'Order')} ${o.num}`);
 }
 PAGE_EVENTS.click.push((e, t, d) => {
