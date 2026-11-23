@@ -25,8 +25,10 @@ href = function (path = '', query = '') {
   else if (a === 'subscricao') r = b ? 'subscrever/' + b : 'caixas';
   else if (a === 'agricultores') { const id = b || qs.get('id'); qs.delete('id'); if (id) r = 'agricultor/' + id; else { r = 'mapa'; qs.set('v', 'quintas'); } }
   else if (a === 'restaurantes') { r = 'mapa'; qs.set('v', 'restaurantes'); }
+  else if (a === 'restaurante') { const id = qs.get('id'); qs.delete('id'); r = id ? 'restaurante/' + id : 'mapa'; if (!id) qs.set('v', 'restaurantes'); }
+  else if (a === 'cooperativa') r = 'cooperativa';
   else if (a === 'colhe-connosco') r = 'colhe';
-  else if (a === 'conta') { if (qs.get('tab')) { r = 'g/' + qs.get('tab'); qs.delete('tab'); } else { const s = qs.get('sec'); qs.delete('sec'); r = s ? 'conta/' + s : 'conta'; } }
+  else if (a === 'conta') { if (qs.get('tab') && roleOf() === 'admin') { r = 'g/' + qs.get('tab'); qs.delete('tab'); } else { const s = qs.get('sec'); qs.delete('sec'); r = s ? 'conta/' + s : 'conta'; } }
   else if (a === 'parceiro') r = roleHome();
   else if (a === 'finalizar') { const n = qs.get('encomenda'); if (n) { qs.delete('encomenda'); qs.set('nova', '1'); r = 'encomenda/' + n; } else r = 'finalizar'; }
   else if (a === 'contacto' && qs.get('encomenda')) { r = 'encomenda/' + qs.get('encomenda'); qs.delete('encomenda'); }
@@ -40,7 +42,7 @@ const roleOf = (u = currentUser()) => (!u ? 'cliente' : u.role === 'admin' ? 'ad
 const roleHome = (u = currentUser()) => ({ cliente: 'inicio', agricultor: 'p/produtos', restaurante: 'r/perfil', admin: 'g/pedidos' }[roleOf(u)]);
 const TABS = () => ({
   cliente: [['inicio', 'home', T('Início', 'Home')], ['loja', 'basket', T('Loja', 'Shop')], ['mapa', 'map', T('Mapa', 'Map')], ['conta', 'user', T('Conta', 'Account')]],
-  agricultor: [['p/produtos', 'leaf', T('Produtos', 'Produce')], ['p/colhe', 'sprout', T('Colhe', 'Harvest')], ['p/propostas', 'inbox', T('Propostas', 'Proposals')], ['p/conta', 'user', T('Conta', 'Account')]],
+  agricultor: [['p/produtos', 'leaf', T('Produtos', 'Produce')], ['p/entregas', 'truck', T('Entregas', 'Supplies')], ['p/colhe', 'sprout', T('Colhe', 'Harvest')], ['p/propostas', 'inbox', T('Propostas', 'Proposals')], ['p/conta', 'user', T('Conta', 'Account')]],
   restaurante: [['r/perfil', 'utensils', T('Perfil', 'Profile')], ['r/pratos', 'list', T('Pratos', 'Dishes')], ['loja', 'basket', T('Loja', 'Shop')], ['r/conta', 'user', T('Conta', 'Account')]],
   admin: [['g/pedidos', 'inbox', T('Pedidos', 'Requests')], ['g/encomendas', 'box', T('Encomendas', 'Orders')], ['g/catalogo', 'leaf', T('Catálogo', 'Catalogue')], ['g/mais', 'menu', T('Mais', 'More')]]
 });
@@ -158,7 +160,7 @@ function scrInicio(u) {
   const favs = u ? (u.favs || []).map(P).filter(p => p && available(p)) : [];
   const season = favs.length ? favs : PRODUCTS.filter(p => p.cat !== 'caixas' && p.essential && available(p)).slice(0, 8);
   return { title: T('Início', 'Home'), hero: true, html: `
-    <header class="a-hero"><div class="a-hero-in"><img src="${LOGO_GOLD}" alt="Daqui" class="a-hero-logo"><div class="a-hero-actions">${langToggle()}</div></div>
+    <header class="a-hero"><div class="a-hero-in"><img src="${LOGO_GOLD}" alt="Daqui" class="a-hero-logo"><div class="a-hero-actions">${appBell(u)}</div></div>
       <h1>${greeting()}${u ? ', ' + esc(u.name.split(' ')[0]) : ''}</h1><p>${T('Fruta e legumes da época, do campo para si.', 'Seasonal fruit and veg, from the field to you.')}</p></header>
     <div class="a-pad a-next-wrap">${nextCard}</div>
     ${sec(T('Caixas da semana', 'This week\'s boxes'), `<div class="a-rail">${boxes.map(boxCard).join('')}</div>`, `<a class="link small" href="#/caixas">${T('Subscrever', 'Subscribe')}</a>`)}
@@ -166,7 +168,7 @@ function scrInicio(u) {
       ${rests.map(r => `<a class="a-row" href="#/mapa?v=restaurantes"><span class="a-row-ic gold">${icon('utensils', 20)}</span><span><b>${esc(r.name)}</b><span class="muted small">${esc(L(r.dish))}</span></span><span class="a-km">${fmtKm(r.km)}</span></a>`).join('')}</div>
       ${appPos ? '' : `<button class="a-locate" data-app-locate>${icon('locate', 18)}${T('Usar a minha localização', 'Use my location')}</button>`}`, `<a class="link small" href="#/mapa">${T('Mapa', 'Map')}</a>`)}
     ${sec(favs.length ? T('Os seus favoritos na época', 'Your favourites in season') : T('Essenciais da época', 'Seasonal essentials'), `<div class="a-rail small">${season.map(prodCard).join('')}</div>`, `<a class="link small" href="#/loja">${T('Ver loja', 'Shop')}</a>`)}
-    ${sec(JTH(), `<a class="a-banner" href="#/colhe"><span>${farmSVG(5, 'diospiro')}</span><span><b>${T('Venha colher connosco', 'Come and pick with us')}</b><span class="small">${HARVEST_DAYS.filter(d => d.date >= iso(today())).length} ${T('dias abertos', 'open days')}</span></span>${icon('chevR', 20)}</a>`)}`, after: nextRailDots };
+    ${colheCard()}`, after: nextRailDots };
 }
 
 /* loja: pesquisa, atalhos de categoria e filtros como no site (categoria, disponibilidade, modo de produção, região e preço) */
@@ -223,7 +225,7 @@ function scrProduto(id, u) {
     <div class="a-pdp">
       <h1>${esc(L(p.name))}</h1>
       ${box ? `<p class="muted">${T('Vários agricultores; a composição muda todas as semanas.', 'Several farmers; the selection changes every week.')}</p>`
-        : nOff ? `${nOff > 1 ? `<p class="lbl a-farms-h">${T(`Produzido por ${nOff} agricultores`, `Grown by ${nOff} farmers`)}</p>` : ''}<div class="a-farms">${farmersOf(p).map(fid => { const x = F(fid), kinds = offersOf(p).filter(o => o.farmer === fid).map(o => bioName(o.organic).toLowerCase()); return `<a class="a-farm" href="${farmerHref(x)}"><span class="a-farm-art">${farmSVG(x.seed || 0, x.crop || 'pera')}</span><span><b>${esc(x.farm)}</b><span class="muted small">${esc(x.name)}, ${esc(x.place)}${hasBio(p) && hasConv(p) ? ` · ${kinds.join(T(' e ', ' and '))}` : ''}</span></span>${icon('chevR', 18)}</a>`; }).join('')}</div>`
+        : nOff ? `${nOff > 1 ? `<p class="lbl a-farms-h">${T(`Produzido por ${nOff} agricultores`, `Grown by ${nOff} farmers`)}</p>` : ''}<div class="a-farms">${farmersOf(p).map(fid => { const x = F(fid), kinds = offersOf(p).filter(o => o.farmer === fid).map(o => bioName(o.organic).toLowerCase()); const lh = latestHarvest(p.id, fid); return `<a class="a-farm" href="${farmerHref(x)}"><span class="a-farm-art">${farmPic(x)}</span><span><b>${esc(x.farm)}</b><span class="muted small">${esc(x.name)}, ${esc(x.place)}${hasBio(p) && hasConv(p) ? ` · ${kinds.join(T(' e ', ' and '))}` : ''}</span>${lh ? `<span class="small fm-harv">${T('Colheita mais recente', 'Latest harvest')}: ${fdate(lh)}</span>` : ''}</span>${icon('chevR', 18)}</a>`; }).join('')}</div>`
         : `<p class="note small">${icon('alert', 20)}<span>${T('De momento nenhum agricultor fornece este produto.', 'No farmer supplies this product at the moment.')}</span></p>`}
       <div class="a-pdp-price"><b>${money(unit)}</b><span>${box ? `${sizes.find(s => s.s === detSize).kg} kg` : unitLabel(p.unit) + (hasBio(p) ? `, ${bioName(detBio).toLowerCase()}` : '')}</span>${badges(p)}</div>
       ${!box && hasBio(p) && hasConv(p) ? `<fieldset class="a-sizes a-bio"><legend class="lbl">${T('Modo de produção', 'Farming method')}</legend>${[false, true].map(b => `<button type="button" data-det-bio="${b ? 1 : 0}" aria-pressed="${detBio === b}"${offerOn(p, b) ? '' : ' disabled'}><b>${bioName(b)}</b><span>${money(variantPrice(p, b))}${unitLabel(p.unit)}${b ? ` (+${Math.round(BIO_EXTRA * 100)}%)` : ''}${offerOn(p, b) ? '' : ' · ' + T('esgotado', 'sold out')}</span></button>`).join('')}</fieldset>` : ''}
@@ -233,10 +235,11 @@ function scrProduto(id, u) {
       <p class="a-lead">${esc(L(p.desc))}</p>
       ${box && sample.length ? `<h2 class="a-h2">${T('Esta semana pode levar', 'This week it may include')}</h2><div class="a-tags">${sample.map(x => `<span>${esc(L(x.name))}</span>`).join('')}</div>${u ? `<p class="small muted">${T('Respeita os produtos que não quer receber.', 'Respects the products you\'d rather not get.')} <a class="link" href="#/conta/preferencias">${T('Preferências', 'Preferences')}</a></p>` : ''}` : ''}
       ${!box ? `<h2 class="a-h2">${T('Época', 'Season')}</h2><div class="a-months">${months}</div>
-        <p class="small muted">${h ? `${T('Colheita', 'Harvested')}: ${fdate(h)}${isStored(p) ? T(', conservada em frio', ', cold-stored') : ''}.` : T(`Fora de época. Volta em ${monthName(p.season[0])}.`, `Out of season. Back in ${monthName(p.season[0])}.`)}</p>` : ''}
+        <p class="small muted">${h ? `${T('Colheita mais recente', 'Latest harvest')}: ${fdate(h)}${isStored(p) ? T(', conservada em frio', ', cold-stored') : ''}.` : T(`Fora de época. Volta em ${monthName(p.season[0])}.`, `Out of season. Back in ${monthName(p.season[0])}.`)}</p>` : ''}
       <h2 class="a-h2">${T('Para onde vai o seu dinheiro', 'Where your money goes')}</h2>
       ${splitBar(p, false)}<div class="a-split-cap"><span><i class="k1"></i>${T('Agricultor', 'Farmer')} ${sa}%</span><span><i class="k2"></i>${T('Conservação', 'Storage')} ${sb}%</span><span><i class="k3"></i>Daqui ${sc}%</span></div><p class="small muted a-vat">${VAT_NOTE()}</p>
       ${productInfo(p).map(([ic, title, body]) => `<details class="a-acc"><summary>${icon(ic, 18)}${title}</summary><div class="a-acc-body small">${body}</div></details>`).join('')}
+      ${wrapSite('produto', reviewsSection(p, true))}
     </div>
     <div class="a-buy">${available(p) || box ? `<div class="qty"><button data-det-qty="-1" aria-label="${byKg(p) ? T('Menos meio quilo', 'Half a kilo less') : T('Menos um', 'One less')}">${icon('minus', 16)}</button><span aria-live="polite">${fmtQty(detQty, p)}</span><button data-det-qty="1" aria-label="${byKg(p) ? T('Mais meio quilo', 'Half a kilo more') : T('Mais um', 'One more')}">${icon('plus', 16)}</button></div>
       <button class="a-big-btn" data-det-add="${p.id}">${T('Adicionar', 'Add')} · ${money(total)}</button>`
@@ -248,8 +251,8 @@ function scrMapa() {
   let body = '';
   if (mapaV === 'recolha') body = `<div class="a-list">${pickupList().map(p => `<div class="a-row"><span class="a-row-ic">${icon('store', 20)}</span><span><b>${esc(p.name)}</b><span class="muted small">${T('Quinta-feira', 'Thursday')} ${pickupHours('qui')}, ${T('sábado', 'Saturday')} ${pickupHours('sab')}</span></span><span class="a-km">${fmtKm(p.km)}</span></div>`).join('')}</div>
     <p class="small muted mt-s">${T('Escolhe o ponto de recolha ao finalizar a encomenda ou na subscrição.', 'You choose the collection point at checkout or in your subscription.')}</p>`;
-  if (mapaV === 'restaurantes') body = `<div class="a-map">${aveiroMapSVG(RESTAURANTS, lang, '')}</div><div class="a-list">${restList().map(r => `<div class="a-row" id="${r.id}" tabindex="-1"><span class="a-row-ic gold">${icon('utensils', 20)}</span><span><b>${esc(r.name)}</b><span class="muted small">${esc(L(r.kind))}. ${esc(L(r.dish))}</span></span><span class="a-km">${fmtKm(r.km)}</span></div>`).join('')}</div>`;
-  if (mapaV === 'quintas') body = `<div class="a-map pt">${portugalMapSVG(farmersForMap(), lang, '')}</div><div class="a-list">${farmList().map(f => `<a class="a-row" href="${farmerHref(f)}"><span class="a-row-ic">${icon('tractor', 20)}</span><span><b>${esc(f.farm)}</b><span class="muted small">${esc(f.name)}, ${esc(f.place)}</span></span><span class="a-km">${fmtKm(f.km)}</span></a>`).join('')}</div>`;
+  if (mapaV === 'restaurantes') body = `${appCuisineChips()}<div class="a-map">${aveiroMapSVG(restList().filter(appRestOk).map(r => Object.assign({}, r, { href: '#/restaurante/' + r.id })), lang, '')}</div><div class="a-list">${restList().filter(appRestOk).map(r => `<div class="a-row" id="${r.id}" tabindex="-1"><span class="a-row-ic gold">${icon('utensils', 20)}</span><span><b>${esc(r.name)}</b><span class="muted small">${esc(cuisineName(r))}. ${esc(L(r.dish))} ${vegBadges({ veg: r.dishVeg, vegan: r.dishVegan }, true)}</span></span><span class="a-km">${fmtKm(r.km)}</span><a class="a-row-link" href="#/restaurante/${r.id}" aria-label="${T('Ver', 'See')} ${esc(r.name)}">${icon('chevR', 18)}</a></div>`).join('')}</div>`;
+  if (mapaV === 'quintas') body = `${appRegionChips()}<div class="a-map pt">${portugalMapSVG(farmersForMap().filter(f => appRegion === 'all' || f.region === appRegion), lang, '')}</div><div class="a-list">${farmList().filter(f => appRegion === 'all' || f.region === appRegion).map(f => `<a class="a-row" href="${farmerHref(f)}"><span class="a-row-ic">${icon('tractor', 20)}</span><span><b>${esc(f.farm)}</b><span class="muted small">${esc(f.name)}, ${esc(f.place)}</span></span><span class="a-km">${fmtKm(f.km)}</span></a>`).join('')}</div>`;
   return { title: T('Mapa', 'Map'), fab: true, html: `<div class="a-sticky"><div class="a-seg" role="tablist">${views.map(([k, n]) => `<button role="tab" data-mapa="${k}" aria-selected="${mapaV === k}">${n}</button>`).join('')}</div></div>
     <div class="a-pad">${appPos ? `<p class="small muted mb-s">${icon('locate', 14)} ${T('Distâncias a partir da sua localização.', 'Distances from your location.')} <button class="link" data-app-locate>${T('Atualizar', 'Update')}</button></p>` : `<button class="a-locate mb-s" data-app-locate>${icon('locate', 18)}${T('Usar a minha localização', 'Use my location')}</button><p class="small muted mb-s">${T('Sem localização, as distâncias contam a partir do centro de Aveiro.', 'Without your location, distances are from Aveiro city centre.')}</p>`}${body}</div>` };
 }
@@ -261,7 +264,7 @@ function appHelpRows(chat = true) {
     ['#/info/contacto', 'phone', T('Contacto e ajuda', 'Contact and help')], ['#/info/faq', 'help', T('Perguntas frequentes', 'FAQ')], ['#/info/sobre', 'leaf', T('Sobre a Daqui', 'About Daqui')]];
   const legal = [['termos', T('Termos de utilização', 'Terms of use')], ['privacidade', T('Privacidade', 'Privacy')], ['cookies', 'Cookies'], ['devolucoes', T('Devoluções e reembolsos', 'Refunds')]];
   const row = ([h, ic, t, sub]) => `<a class="a-row" href="${h}"><span class="a-row-ic">${icon(ic, 20)}</span><span><b>${t}</b>${sub ? `<span class="muted small">${sub}</span>` : ''}</span>${icon('chevR', 18)}</a>`;
-  return `<div class="a-menu">${list.map(row).join('')}</div><h2 class="a-h2 a-menu-h">${T('Informação legal', 'Legal')}</h2><div class="a-menu">${legal.map(([k, t]) => row([`#/info/politicas?sec=${k}`, 'shield', t])).join('')}</div>`;
+  return `<div class="a-menu">${list.map(row).join('')}</div><h2 class="a-h2 a-menu-h">${T('Informação legal', 'Legal')}</h2><div class="a-menu">${legal.map(([k, t]) => row([`#/info/${k}`, 'shield', t])).join('')}</div>`;
 }
 function scrMensagens(u) {
   return { title: T('Falar com a Daqui', 'Talk to Daqui'), back: true, noTabs: false, html: `<div class="a-pad a-chat">${chatBody()}</div>`, after: () => { const c = myConv(); if (c) chatMarkRead(c, 'gestao'); const m = $('#msgs'); if (m) m.scrollTop = m.scrollHeight; chatPoll(); } };
@@ -269,7 +272,7 @@ function scrMensagens(u) {
 function scrConta(u) {
   const rows = (list) => `<div class="a-menu">${list.map(([h, ic, t, sub]) => `<a class="a-row" href="${h}"><span class="a-row-ic">${icon(ic, 20)}</span><span><b>${t}</b>${sub ? `<span class="muted small">${sub}</span>` : ''}</span>${icon('chevR', 18)}</a>`).join('')}</div>`;
   const help = appHelpRows();
-  const langRow = `<div class="a-row"><span class="a-row-ic">${icon('globe', 20)}</span><span><b>${T('Língua', 'Language')}</b></span>${langToggle()}</div>`;
+  const langRow = settingsRow();
   const pushRow = NATIVO.pushAvailable() && u ? `<button class="a-row" data-push-on><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${NATIVO.pushState === 'on' ? T('Ativas neste telemóvel', 'On for this phone') : T('Toque para ativar', 'Tap to turn on')}</span></span>${icon('chevR', 18)}</button>` : '';
   if (!u) return { title: T('Conta', 'Account'), fab: true, html: `<div class="a-pad"><div class="a-guest">${icon('user', 34)}<h2>${T('Entre ou crie conta', 'Sign in or create an account')}</h2><p class="muted">${T('Para seguir encomendas, guardar favoritos e subscrever caixas.', 'To track orders, save favourites and subscribe to boxes.')}</p>
     <a class="a-big-btn" href="#/entrar">${T('Entrar', 'Sign in')}</a><a class="a-big-btn ghost" href="#/entrar?modo=registo">${T('Criar conta', 'Create account')}</a></div>
@@ -280,8 +283,8 @@ function scrConta(u) {
     ${nova ? `<p class="note done">${icon('check', 22)}<span><b>${T('Subscrição confirmada', 'Subscription confirmed')}: ${esc(L(P(nova.box).name))}.</b> ${T('Primeira entrega', 'First delivery')}: ${slotLabel(nova.first)}.</span></p>` : ''}
     <div class="a-profile"><span class="a-avatar">${esc(u.name.split(' ').map(x => x[0]).slice(0, 2).join(''))}</span><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.username)}, ${esc(u.phone)}</span></span></div>
     ${rows([['#/conta/encomendas', 'box', T('Encomendas', 'Orders'), `${orders.length} ${orders.length === 1 ? T('encomenda', 'order') : T('encomendas', 'orders')}${(n => n ? `, ${n} ${n === 1 ? T('registo do Colhe Connosco', 'harvest record') : T('registos do Colhe Connosco', 'harvest records')}` : '')(harvestRecords(u).length)}`], ['#/conta/subscricoes', 'repeat', T('Subscrições', 'Subscriptions'), (n => `${n} ${n === 1 ? T('ativa', 'active') : T('ativas', 'active')}`)((u.subs || []).filter(s => s.status === 'ativa').length)],
-      ['#/conta/preferencias', 'heart', T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), `${(u.favs || []).length} ${(u.favs || []).length === 1 ? T('favorito', 'favourite') : T('favoritos', 'favourites')}, ${(u.exclude || []).length} ${T('excluídos', 'excluded')}, ${(u.notify || []).length} ${(u.notify || []).length === 1 ? T('aviso', 'reminder') : T('avisos', 'reminders')}`], ['#/conta/colhe', 'sprout', JTH(), (n => `${n} ${n === 1 ? T('inscrição', 'sign-up') : T('inscrições', 'sign-ups')}`)((u.harvests || []).length)], ['#/conta/dados', 'user', T('Dados e morada', 'Details and address'), T('Também para alterar a palavra-passe', 'Also to change your password')]])}
-    <div class="a-menu">${langRow}${pushRow}</div>${help}
+      ['#/conta/preferencias', 'heart', T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), `${(u.favs || []).length} ${(u.favs || []).length === 1 ? T('favorito', 'favourite') : T('favoritos', 'favourites')}, ${(u.exclude || []).length} ${T('excluídos', 'excluded')}, ${(u.notify || []).length} ${(u.notify || []).length === 1 ? T('aviso', 'reminder') : T('avisos', 'reminders')}`], ['#/conta/colhe', 'sprout', JTH(), (n => `${n} ${n === 1 ? T('inscrição', 'sign-up') : T('inscrições', 'sign-ups')}`)((u.harvests || []).length)], ['#/conta/carteira', 'wallet', T('Saldo e Cooperativa', 'Balance and Co-op'), `${money(balanceOf(u))}${isMember(u) ? ' · ' + T('membro', 'member') : ''}`], ['#/conta/faturas', 'receipt', T('Faturas', 'Invoices'), T('Ver e descarregar em PDF', 'View and download as PDF')], ['#/conta/dados', 'user', T('Dados e morada', 'Details and address'), T('E-mail, telemóvel, NIF e palavra-passe', 'Email, mobile, tax number and password')]])}
+    <div class="a-menu">${langRow}</div>${help}
     <button class="a-big-btn ghost danger" data-logout>${icon('logout', 18)} ${T('Terminar sessão', 'Sign out')}</button></div>` };
 }
 
@@ -351,16 +354,17 @@ function myProposals(u) {
 function adminMais() {
   const kp = `<div class="kpis"><div><strong>${REQUESTS.filter(r => r.status === 'novo').length}</strong><span>${T('pedidos novos', 'new requests')}</span></div><div><strong>${ORDERS.filter(o => orderStage(o) < 3).length}</strong><span>${T('por entregar', 'to deliver')}</span></div><div><strong>${Object.values(USERS).flatMap(c => c.subs || []).filter(s => s.status === 'ativa').length}</strong><span>${T('subscrições', 'subscriptions')}</span></div><div><strong>${Object.values(USERS).filter(x => x.role !== 'admin').length}</strong><span>${T('contas', 'accounts')}</span></div></div>`;
   const nm = chatUnread();
-  const rows = [['#/g/mensagens', 'chat', T('Mensagens', 'Messages') + (nm ? ` <span class="count-in">${nm}</span>` : '')], ['#/g/caixas', 'box', T('Caixas e preços', 'Boxes and prices')], ['#/g/colhe', 'sprout', JTH()], ['#/g/subscricoes', 'repeat', T('Subscrições', 'Subscriptions')], ['#/g/contas', 'users', T('Contas', 'Accounts')], ['#/conta/dados', 'lock', T('Dados e palavra-passe', 'Details and password')], ['#/g/dados', 'app', NUVEM.on ? T('Base de dados', 'Database') : T('Guardar alterações', 'Save changes')]];
+  const rows = [['#/g/mensagens', 'chat', T('Mensagens', 'Messages') + (nm ? ` <span class="count-in">${nm}</span>` : '')], ['#/g/preparar', 'box', T('Preparar caixas', 'Prepare boxes')], ['#/g/inventario', 'list', T('Inventário', 'Inventory')],
+    ['#/g/promocoes', 'gift', T('Promoções e códigos', 'Promotions and codes')], ['#/g/parceiros', 'tractor', T('Agricultores e restaurantes', 'Farmers and restaurants')], ['#/g/definicoes', 'gear', T('Definições da loja', 'Shop settings')], ['#/g/caixas', 'box', T('Caixas e preços', 'Boxes and prices')], ['#/g/colhe', 'sprout', JTH()], ['#/g/subscricoes', 'repeat', T('Subscrições', 'Subscriptions')], ['#/g/contas', 'users', T('Contas', 'Accounts')], ['#/conta/dados', 'lock', T('Dados e palavra-passe', 'Details and password')], ['#/g/dados', 'app', NUVEM.on ? T('Base de dados', 'Database') : T('Guardar alterações', 'Save changes')]];
   return `<div class="a-pad">${NUVEM.badge()}${kp}<div class="a-menu">${rows.map(([h, ic, t]) => `<a class="a-row" href="${h}"><span class="a-row-ic">${icon(ic, 20)}</span><span><b>${t}</b></span>${icon('chevR', 18)}</a>`).join('')}</div>
-    <div class="a-menu"><div class="a-row"><span class="a-row-ic">${icon('globe', 20)}</span><span><b>${T('Língua', 'Language')}</b></span>${langToggle()}</div>${NATIVO.pushAvailable() ? `<button class="a-row" data-push-on><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${NATIVO.pushState === 'on' ? T('Ativas neste telemóvel', 'On for this phone') : T('Toque para ativar', 'Tap to turn on')}</span></span>${icon('chevR', 18)}</button>` : ''}</div>
+    <div class="a-menu">${settingsRow()}${NATIVO.pushAvailable() && false ? `<button class="a-row" data-push-on><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${NATIVO.pushState === 'on' ? T('Ativas neste telemóvel', 'On for this phone') : T('Toque para ativar', 'Tap to turn on')}</span></span>${icon('chevR', 18)}</button>` : ''}</div>
     ${appHelpRows(false)}
     <button class="a-big-btn ghost danger" data-logout>${icon('logout', 18)} ${T('Terminar sessão', 'Sign out')}</button></div>`;
 }
 function partnerConta(u, extra) {
   return `<div class="a-profile"><span class="a-avatar">${esc(u.name.split(' ').map(x => x[0]).slice(0, 2).join(''))}</span><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.username)}, ${esc(u.phone)}</span></span></div>
     ${extra}${contaSection('dados')}
-    <div class="a-menu"><div class="a-row"><span class="a-row-ic">${icon('globe', 20)}</span><span><b>${T('Língua', 'Language')}</b></span>${langToggle()}</div>${NATIVO.pushAvailable() ? `<button class="a-row" data-push-on><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${NATIVO.pushState === 'on' ? T('Ativas neste telemóvel', 'On for this phone') : T('Toque para ativar', 'Tap to turn on')}</span></span>${icon('chevR', 18)}</button>` : ''}
+    <div class="a-menu">${settingsRow()}${NATIVO.pushAvailable() && false ? `<button class="a-row" data-push-on><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${NATIVO.pushState === 'on' ? T('Ativas neste telemóvel', 'On for this phone') : T('Toque para ativar', 'Tap to turn on')}</span></span>${icon('chevR', 18)}</button>` : ''}
       <a class="a-row" href="#/conta/encomendas"><span class="a-row-ic">${icon('box', 20)}</span><span><b>${T('Encomendas', 'Orders')}</b></span>${icon('chevR', 18)}</a></div>
     ${appHelpRows()}
     <button class="a-big-btn ghost danger" data-logout>${icon('logout', 18)} ${T('Terminar sessão', 'Sign out')}</button>`;
@@ -378,9 +382,14 @@ function appScreen(path, u) {
   if (a === 'mapa') { if (QS.get('v')) mapaV = QS.get('v'); return scrMapa(); }
   if (a === 'conta' && !b) return scrConta(u);
   if (a === 'conta' && b === 'encomendas') return scrEncomendas(u);
-  if (a === 'conta') { if (!u) return { redirect: 'entrar?next=conta' }; BACK = /^subscricao\/[a-z0-9-]+$/.test(QS.get('voltar') || '') ? QS.get('voltar') : ''; const names = { subscricoes: T('Subscrições', 'Subscriptions'), preferencias: T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), colhe: JTH(), dados: role === 'admin' ? T('Dados e palavra-passe', 'Details and password') : T('Dados e morada', 'Details and address') };
+  if (a === 'conta') { if (!u) return { redirect: 'entrar?next=conta' }; BACK = /^subscricao\/[a-z0-9-]+$/.test(QS.get('voltar') || '') ? QS.get('voltar') : ''; const names = { carteira: T('Saldo e Cooperativa', 'Balance and Co-op'), faturas: T('Faturas', 'Invoices'), subscricoes: T('Subscrições', 'Subscriptions'), preferencias: T('Favoritos, exclusões e avisos', 'Favourites, exclusions and reminders'), colhe: JTH(), dados: role === 'admin' ? T('Dados e palavra-passe', 'Details and password') : T('Dados e morada', 'Details and address') };
     return { title: names[b] || T('Conta', 'Account'), back: true, html: `<div class="a-pad">${contaSection(b) || ''}</div>` }; }
   if (a === 'mensagens') return role === 'admin' ? { redirect: 'g/mensagens' } : scrMensagens(u);
+  if (a === 'definicoes') return scrDefinicoes(u);
+  if (a === 'notificacoes') return u ? scrNotificacoes(u) : { redirect: 'entrar?next=notificacoes' };
+  if (a === 'restaurante') { PID = b; QS = new URLSearchParams('id=' + b); const o = sitePage('restaurante'); return { title: o.title, back: true, html: o.html, after: o.after }; }
+  if (a === 'cooperativa') { const o = sitePage('cooperativa'); return { title: T('Cooperativa', 'Co-op'), back: true, fab: true, html: o.html, after: o.after }; }
+  if (a === 'p' && b === 'entregas') return { title: T('Entregas à Daqui', 'Supplies to Daqui'), html: `<div class="a-pad">${partnerTab(u, [3])}</div>` };
   if (a === 'encomenda') return scrEncomenda(b, u);
   if (a === 'incidencia') return scrIncidencia(b);
   if (a === 'caixas') { const o = sitePage('subscricao'); return { title: T('Caixas da Estação', 'Seasonal boxes'), back: true, fab: true, html: o.html, after: o.after }; }
@@ -394,7 +403,7 @@ function appScreen(path, u) {
   /* agricultor */
   if (path === 'p/produtos') return { title: T('Os meus produtos', 'My produce'), html: `<div class="a-pad">${partnerTab(u, [1])}</div>` };
   if (path === 'p/colhe') return { title: JTH(), html: `<div class="a-pad">${partnerTab(u, [2])}</div>` };
-  if (path === 'p/propostas') return { title: T('Propostas', 'Proposals'), html: `<div class="a-pad">${myProposals(u)}${partnerTab(u, [3])}</div>` };
+  if (path === 'p/propostas') return { title: T('Propostas', 'Proposals'), html: `<div class="a-pad">${myProposals(u)}</div>` };
   if (path === 'p/conta') return { title: T('Conta', 'Account'), html: `<div class="a-pad">${partnerConta(u, partnerTab(u, [0]))}</div>` };
   /* restaurante */
   if (path === 'r/perfil') return { title: esc(u.partner.name || T('Restaurante', 'Restaurant')), html: `<div class="a-pad">${partnerTab(u, [0, 1])}</div>` };
@@ -405,6 +414,7 @@ function appScreen(path, u) {
     PAGE = 'conta';
     const map = { pedidos: [tabPedidos, T('Pedidos', 'Requests')], mensagens: [tabMensagens, T('Mensagens', 'Messages')], encomendas: [tabEncomendas, T('Encomendas', 'Orders')], catalogo: [tabCatalogo, T('Catálogo', 'Catalogue')], caixas: [tabCaixas, T('Caixas e preços', 'Boxes and prices')],
       colhe: [tabColhe, JTH()], subscricoes: [tabSubs, T('Subscrições', 'Subscriptions')], contas: [tabContas, T('Contas', 'Accounts')], dados: [tabExportar, NUVEM.on ? T('Base de dados', 'Database') : T('Guardar alterações', 'Save changes')] };
+    Object.entries(ADMIN_EXTRA).forEach(([k, [n, fn]]) => { map[k] = [fn, n()]; });
     if (b === 'mais') return { title: T('Gestão', 'Management'), html: adminMais() };
     const [fn, title] = map[b] || map.pedidos;
     return { title, back: !['pedidos', 'encomendas', 'catalogo'].includes(b), html: `<div class="a-pad">${wrapSite('conta', fn())}</div>` };
@@ -432,7 +442,10 @@ render = function appRender() {
   $('#app').innerHTML = `${NUVEM.banner()}${bar}<main id="main" class="a-main${scr.hero ? ' has-hero' : ''}${scr.noBar ? ' no-bar' : ''}${scr.bare ? ' bare' : ''}" tabindex="-1">${scr.html}</main>${fab}${nav}`;
   document.title = `Daqui | ${String(scr.title).replace(/<[^>]+>/g, '')}`;
   document.body.classList.toggle('a-has-buy', !!$('.a-buy'));
-  tableCards(); if (scr.after) try { scr.after(); } catch (e) { console.warn(e); }
+  tableCards(); setupRails(); if (scr.after) try { scr.after(); } catch (e) { console.warn(e); }
+  if (appAnim && LOOK.anim && !matchMedia('(prefers-reduced-motion: reduce)').matches) { const m = $('#main'); m.classList.add('a-enter-' + appAnim); setTimeout(() => m.classList.remove('a-enter-' + appAnim), 400); }
+  appAnim = '';
+  if (typeof refreshBell === 'function') { const b = $('.a-hero [data-app-bell]'); if (b) b.outerHTML = appBell(currentUser()); }
   NATIVO.bars(!!$('.a-pdp-hero'));   // ícones escuros na barra de estado quando o topo do ecrã é claro
 };
 /* tabelas largas (painel de gestão) viram cartões no telemóvel: cada célula recebe o nome da coluna */
@@ -441,9 +454,10 @@ function tableCards() { $$('#main table.tbl').forEach(t => { const hs = $$('thea
 /* ---------- navegação ---------- */
 window.addEventListener('hashchange', () => {
   const h = location.hash;
-  if (appReplacing) { appStack[appStack.length - 1] = h; appReplacing = false; }
-  else if (appStack.length > 1 && appStack[appStack.length - 2] === h) appStack.pop();
-  else appStack.push(h);
+  const tabRoot = isTabRoot(h.replace(/^#\//, '').split('?')[0]);
+  if (appReplacing) { appStack[appStack.length - 1] = h; appReplacing = false; appAnim = 'fade'; }
+  else if (appStack.length > 1 && appStack[appStack.length - 2] === h) { appStack.pop(); appAnim = 'back'; }
+  else { appStack.push(h); appAnim = tabRoot ? 'fade' : 'fwd'; }
   if ($('#modal').classList.contains('on')) closeModal(); if ($('#drawer').classList.contains('on')) closeCart();
   render(); scrollTo(0, 0);
 });
@@ -526,7 +540,7 @@ document.addEventListener('pointerdown', e => {
   knob.setPointerCapture(e.pointerId); track.classList.add('dragging');
   const move = ev => { dx = Math.max(0, Math.min(max, ev.clientX - x0)); knob.style.transform = `translateX(${dx}px)`; track.style.setProperty('--p', (dx / max).toFixed(2)); };
   const up = () => { knob.removeEventListener('pointermove', move); knob.removeEventListener('pointerup', up); knob.removeEventListener('pointercancel', up); track.classList.remove('dragging');
-    if (dx >= max * 0.85) { knob.style.transform = `translateX(${max}px)`; confirmPickup(knob.dataset.swipeKnob); } else { knob.style.transform = ''; track.style.setProperty('--p', 0); } };
+    if (dx >= max * 0.85) { knob.style.transform = `translateX(${max}px)`; playSound('pickup'); confirmPickup(knob.dataset.swipeKnob); } else { knob.style.transform = ''; track.style.setProperty('--p', 0); } };
   knob.addEventListener('pointermove', move); knob.addEventListener('pointerup', up); knob.addEventListener('pointercancel', up);
 });
 
@@ -534,7 +548,111 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('DOMContentLoaded', () => {
   $('#drawer').setAttribute('inert', '');
   $('#app').innerHTML = `<div class="loading-page" role="status"><img src="${LOGO_GOLD}" alt="Daqui" width="140"><p>${T('A carregar…', 'Loading…')}</p></div>`;
-  const first = () => { APP_READY = true; render(); window.__daquiPronto = true; const f = document.querySelector('#daqui-falha[data-tipo="espera"]'); if (f) f.remove(); NATIVO.ready(); };
+  const first = () => { APP_READY = true; if (!NUVEM.on) loadLocalExtras(); applyLook(); render(); setTimeout(promoPopup, LOOK.anim ? 2300 : 600); window.__daquiPronto = true; const f = document.querySelector('#daqui-falha[data-tipo="espera"]'); if (f) f.remove(); NATIVO.ready(); };
   (NUVEM.configured ? NUVEM.start() : Promise.resolve()).then(first, first);
   if ('serviceWorker' in navigator && !NATIVO.isNative && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+});
+
+/* ===================================================================================
+   v11: sininho, definições (língua, aspeto e permissões), filtros do mapa, transições,
+   animação de abertura, sons e janela de promoções
+   =================================================================================== */
+let appAnim = '', appRegion = 'all', appCuisine = 'all';
+function appBell(u) {
+  if (!u) return `<a class="a-hero-btn" href="#/definicoes" aria-label="${T('Definições', 'Settings')}">${icon('gear', 22)}</a>`;
+  const n = unreadNotifs(u) + PROMOS.filter(p => p.public && promoValid(p) && !claimOf(u, p.id) && !myNotifs(u).some(x => x.promo === p.id)).length;
+  return `<a class="a-hero-btn" href="#/notificacoes" data-app-bell aria-label="${T('Notificações', 'Notifications')}${n ? `, ${n} ${T('por ler', 'unread')}` : ''}">${icon('bell', 22)}${n ? `<span class="count">${n > 9 ? '9+' : n}</span>` : ''}</a>`;
+}
+function settingsRow() { return `<a class="a-row" href="#/definicoes"><span class="a-row-ic">${icon('gear', 20)}</span><span><b>${T('Definições', 'Settings')}</b><span class="muted small">${T('Língua, aspeto e permissões da app', 'Language, appearance and app permissions')}</span></span>${icon('chevR', 18)}</a>`; }
+/* Colhe Connosco no início: cartão grande com o próximo dia */
+function colheCard() {
+  const next = HARVEST_DAYS.filter(d => d.date >= iso(today())).sort((a, b) => a.date.localeCompare(b.date)), d = next[0];
+  const f = d ? F(d.farmer) : null, left = d ? Math.max(0, d.spots - harvestPeople(d.id)) : 0;
+  return `<section class="a-sec"><a class="a-colhe" href="#/colhe">
+    <span class="a-colhe-art">${farmSVG(5, d && d.crop ? d.crop : 'diospiro')}</span>
+    <span class="a-colhe-b"><span class="a-colhe-tag">${icon('sprout', 16)} ${JTH()}</span>
+      <b>${T('Venha colher connosco', 'Come and pick with us')}</b>
+      ${d ? `<span>${slotLabel(d.date)}, ${esc(d.time)}${f ? ` · ${esc(f.farm)}` : ''}</span><span class="small">${esc(L(d.what))} · ${left} ${left === 1 ? T('lugar livre', 'spot left') : T('lugares livres', 'spots left')}</span>`
+        : `<span class="small">${T('Novas datas em breve.', 'New dates soon.')}</span>`}
+      <span class="a-colhe-cta">${next.length > 1 ? T(`Ver os ${next.length} dias`, `See all ${next.length} days`) : T('Inscrever-me', 'Sign me up')} ${icon('chevR', 16)}</span></span></a></section>`;
+}
+/* mapa (quintas): filtro por região, como no site */
+function appRegionChips() {
+  const regions = Object.keys(REGIONS).filter(r => FARMERS.some(f => f.region === r));
+  return `<div class="a-chips" role="group" aria-label="${T('Filtrar por região', 'Filter by region')}">${[['all', T('Todas', 'All')]].concat(regions.map(r => [r, regionName(r)])).map(([k, n]) => `<button class="chip" data-app-region="${k}" aria-pressed="${appRegion === k}">${n}</button>`).join('')}</div>`;
+}
+const appRestOk = r => appCuisine === 'all' || (appCuisine === 'veg' ? restVeg(r) : appCuisine === 'vegan' ? restVegan(r) : cuisineOf(r) === appCuisine);
+function appCuisineChips() {
+  const used = CUISINES.filter(c => RESTAURANTS.some(r => cuisineOf(r) === c.id));
+  return `<div class="a-chips" role="group" aria-label="${T('Filtrar por tipo de cozinha', 'Filter by cuisine')}">${[['all', T('Todos', 'All')], ['veg', T('Vegetariano', 'Vegetarian')], ['vegan', 'Vegan']].concat(used.map(c => [c.id, L(c)])).map(([k, n]) => `<button class="chip" data-app-cuisine="${k}" aria-pressed="${appCuisine === k}">${esc(n)}</button>`).join('')}</div>`;
+}
+/* sininho */
+function scrNotificacoes(u) {
+  return { title: T('Notificações', 'Notifications'), back: true, html: `<div class="a-pad a-bell">${notifListHTML(u)}</div>`, after: () => setTimeout(() => readNotifs(u), 1200) };
+}
+/* definições: língua, aspeto (mapa, animações, sons) e permissões da app */
+let permState = null;
+function scrDefinicoes(u) {
+  const pr = permState || {};
+  const st = v => v === 'granted' ? `<span class="status ativa">${T('Permitido', 'Allowed')}</span>` : v === 'denied' ? `<span class="status pausada">${T('Bloqueado', 'Blocked')}</span>` : `<span class="status prog">${T('Por decidir', 'Not set')}</span>`;
+  if (!permState) setTimeout(() => NATIVO.permissions().then(p => { permState = p; if (/^#\/definicoes/.test(location.hash)) rerenderKeep(); }), 0);
+  return { title: T('Definições', 'Settings'), back: true, html: `<div class="a-pad">
+    <h2 class="a-h2">${T('Língua', 'Language')}</h2>
+    <div class="a-menu"><div class="a-row"><span class="a-row-ic">${icon('globe', 20)}</span><span><b>${T('Língua da app', 'App language')}</b><span class="muted small">${T('Português ou inglês', 'Portuguese or English')}</span></span>${langToggle()}</div></div>
+    <h2 class="a-h2">${T('Aspeto', 'Appearance')}</h2>
+    <div class="a-menu"><label class="a-row"><span class="a-row-ic">${icon('layers', 20)}</span><span><b>${T('Animações', 'Animations')}</b><span class="muted small">${T('Deslizar entre ecrãs e animação de abertura', 'Slide between screens and opening animation')}</span></span><input type="checkbox" class="a-switch" data-look-anim${LOOK.anim ? ' checked' : ''}></label>
+      <label class="a-row"><span class="a-row-ic">${icon('sound', 20)}</span><span><b>${T('Sons', 'Sounds')}</b><span class="muted small">${T('Ao confirmar um levantamento e ao receber notificações', 'When confirming a pick-up and receiving notifications')}</span></span><input type="checkbox" class="a-switch" data-look-sound${LOOK.sound !== false ? ' checked' : ''}></label></div>
+    <p class="lbl mt">${T('Mapa dos restaurantes', 'Restaurants map')}</p>${lookMapChoices()}
+    <h2 class="a-h2">${T('Permissões da app', 'App permissions')}</h2>
+    <div class="a-menu">
+      <button class="a-row" data-perm="push"><span class="a-row-ic">${icon('bell', 20)}</span><span><b>${T('Notificações', 'Notifications')}</b><span class="muted small">${T('Encomendas, promoções e lembretes', 'Orders, promotions and reminders')}</span></span>${st(pr.push)}</button>
+      <button class="a-row" data-perm="location"><span class="a-row-ic">${icon('locate', 20)}</span><span><b>${T('Localização', 'Location')}</b><span class="muted small">${T('Distâncias aos pontos de recolha e restaurantes', 'Distances to pick-up points and restaurants')}</span></span>${st(pr.location)}</button>
+      <button class="a-row" data-perm="camera"><span class="a-row-ic">${icon('camera', 20)}</span><span><b>${T('Câmara', 'Camera')}</b><span class="muted small">${T('Fotografias de incidências e de produtos', 'Photos for problem reports and products')}</span></span>${st(pr.camera)}</button></div>
+    <p class="small muted mt-s">${T('Se uma permissão estiver bloqueada, mude-a nas definições do telemóvel: Aplicações → Daqui → Permissões.', 'If a permission is blocked, change it in your phone settings: Apps → Daqui → Permissions.')}</p>
+    ${appHelpRows(false)}</div>` };
+}
+/* sons curtos (WebAudio, sem ficheiros): confirmar levantamento e notificação recebida com a app aberta */
+let audioCtx = null;
+function playSound(kind) {
+  if (LOOK.sound === false) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = kind === 'pickup' ? [[659.25, 0], [830.61, 0.09], [987.77, 0.18], [1318.5, 0.3]] : [[880, 0], [1174.7, 0.12]];
+    notes.forEach(([f, t0]) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = audioCtx.currentTime + t0;
+      o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + 0.4);
+    });
+    if (navigator.vibrate) navigator.vibrate(kind === 'pickup' ? [30, 40, 30] : 20);
+  } catch (e) {}
+}
+/* janela de promoção ao abrir a app (como nas apps de entregas): reclamar já ou mais tarde (fica no sininho) */
+const PROMO_SEEN_KEY = 'daqui-promos-vistas';
+function promoPopup() {
+  const u = currentUser(); if (!u || roleOf(u) !== 'cliente') return;
+  const seen = store.get(PROMO_SEEN_KEY, []), p = PROMOS.find(x => x.public && promoValid(x) && !claimOf(u, x.id) && !seen.includes(x.id)); if (!p) return;
+  store.set(PROMO_SEEN_KEY, seen.concat(p.id).slice(-50));
+  openModal(`<div class="mbody a-promo-pop"><span class="a-promo-ic">${icon(p.kind === 'portes' ? 'truck' : 'gift', 40)}</span><p class="a-promo-val">${promoLabel(p)}</p><h2>${esc(L(p.title))}</h2><p>${esc(L(p.text))}</p>
+    <p class="small muted">${p.min ? T(`Em compras a partir de ${money(p.min)}. `, `On orders over ${money(p.min)}. `) : ''}${T('Válida até', 'Valid until')} ${fdate(parseISO(p.until), { day: 'numeric', month: 'long' })}.</p>
+    <button class="a-big-btn" data-claim="${p.id}" data-promo-close>${T('Reclamar agora', 'Claim now')}</button><button class="a-big-btn ghost" data-modal-close>${T('Mais tarde (fica no sininho)', 'Later (it stays in the bell)')}</button></div>`, T('Promoção', 'Promotion'));
+}
+/* animação de abertura: a pera do logótipo sobre o verde da Daqui */
+function splash() {
+  if (!LOOK.anim || matchMedia('(prefers-reduced-motion: reduce)').matches || sessionStorage.getItem('daqui-splash')) return;
+  try { sessionStorage.setItem('daqui-splash', '1'); } catch (e) {}
+  const d = document.createElement('div'); d.className = 'a-splash'; d.setAttribute('aria-hidden', 'true');
+  d.innerHTML = `<div class="a-splash-in"><svg class="a-splash-pear" viewBox="0 0 120 150"><path class="sp-body" d="M60 30c-9 0-14 9-14 20 0 9-4 14-11 22-7 9-10 18-10 28 0 22 16 38 35 38s35-16 35-38c0-10-3-19-10-28-7-8-11-13-11-22 0-11-5-20-14-20z"/><path class="sp-stem" d="M60 31c0-8 2-15 7-21"/><path class="sp-leaf" d="M64 18c9-9 22-9 28-4-6 9-19 12-28 4z"/></svg><img src="${LOGO_GOLD}" alt="" class="a-splash-logo"></div>`;
+  document.body.appendChild(d);
+  setTimeout(() => d.classList.add('out'), 1500); setTimeout(() => d.remove(), 2100);
+}
+splash();
+PAGE_EVENTS.click.push((e, t, d) => {
+  if (PAGE_DOC !== 'app') return;
+  if (d.appRegion) { appRegion = d.appRegion; rerenderKeep(`[data-app-region="${d.appRegion}"]`); return true; }
+  if (d.appCuisine) { appCuisine = d.appCuisine; rerenderKeep(`[data-app-cuisine="${d.appCuisine}"]`); return true; }
+  if ('promoClose' in d) { setTimeout(closeModal, 50); return; }
+  if (d.perm) { NATIVO.askPermission(d.perm).then(() => NATIVO.permissions()).then(p => { permState = p; rerenderKeep(`[data-perm="${d.perm}"]`); }, () => toast(T('Não foi possível pedir a permissão.', 'Could not request the permission.'))); return true; }
+});
+PAGE_EVENTS.change.push((e, t) => {
+  if (t.matches('[data-look-sound]')) { setLook({ sound: t.checked }); if (t.checked) playSound('notif'); return true; }
 });

@@ -50,24 +50,28 @@ const F = id => FARMERS.find(f => f.id === id);
 const unitLabel = u => ({ kg: '/kg', un: T('/unidade', '/each'), cx: T('/caixa', '/box'), molho: T('/molho', '/bunch'), cuv: T('/cuvete', '/punnet') }[u] || '');
 const regionName = r => L(REGIONS[r]);
 const freqName = f => ({ sem: T('Semanal', 'Weekly'), quinz: T('Quinzenal', 'Every 2 weeks'), mens: T('Mensal', 'Monthly') }[f]);
-const sizeName = s => ({ P: T('Pequena', 'Small'), M: T('Média', 'Medium'), G: T('Grande', 'Large') }[s]);
+const sizeName = s => ({ P: T('Pequena', 'Small'), M: T('Média', 'Medium'), G: T('Grande', 'Large'), XG: T('Extra grande', 'Extra large'), F: T('Família', 'Family') }[s] || s);
 const dayName = d => ({ qui: T('Quinta-feira', 'Thursday'), sab: T('Sábado', 'Saturday') }[d]);
 const catName = c => ({ fruta: T('Fruta', 'Fruit'), legumes: T('Legumes', 'Vegetables'), caixas: T('Caixas da Estação', 'Seasonal boxes') }[c]);
 
 /* ---------- época, colheita e divisão do preço ---------- */
 const NOW_M = today().getMonth() + 1;
-const available = p => inSeason(p) && !p.outOfStock && !noProducer(p);
+const available = p => inSeason(p) && !p.outOfStock && !noProducer(p) && !(typeof LOTS !== 'undefined' && tracksStock(p) && stockOf(p) <= 0);
 /* produto sem nenhum agricultor que o forneça (todos deixaram de o vender): fica sem stock */
-const soldOut = p => !!p && (p.outOfStock || noProducer(p));   // esgotado ou sem produtor
+const soldOut = p => !!p && (p.outOfStock || noProducer(p) || (typeof LOTS !== 'undefined' && tracksStock(p) && stockOf(p) <= 0));   // esgotado, sem produtor ou sem stock nas entregas
 const noProducer = p => !!p && p.cat !== 'caixas' && !offersOf(p).length;
 function inSeason(p) { if (!p.season) return true; const [a, b] = p.season; return a <= b ? NOW_M >= a && NOW_M <= b : NOW_M >= a || NOW_M <= b; }
 function harvestOf(p) {
+  /* com o inventário (js/dados.js): a colheita mais recente entregue pelos agricultores */
+  if (typeof LOTS !== 'undefined' && p.cat !== 'caixas' && LOTS.length) { const lh = latestHarvest(p.id); if (lh) return lh; }
   if (p.harvest == null || !inSeason(p)) return null;
   if (typeof p.harvest === 'number') return addDays(today(), -p.harvest);
   const [m, d] = p.harvest.split('-').map(Number); let h = new Date(today().getFullYear(), m - 1, d, 12);
   if (h > today()) h = new Date(today().getFullYear() - 1, m - 1, d, 12); return h;
 }
-const isStored = p => { const h = harvestOf(p); return !!h && typeof p.harvest === 'string' && (today() - h) / 864e5 > 20; };
+const isStored = p => {
+  if (typeof LOTS !== 'undefined' && LOTS.length && p.cat !== 'caixas') { const ls = lotsOf(p.id); if (ls.length) { const last = ls.slice().sort((a, b) => a.harvest.localeCompare(b.harvest)).pop(); return !!last.cold; } }
+  const h = harvestOf(p); return !!h && typeof p.harvest === 'string' && (today() - h) / 864e5 > 20; };
 function splitOf(p) {
   if (Array.isArray(p.split) && p.split.length === 3) return p.split;
   if (p.cat === 'caixas') return { 'caixa-mista': [57, 15, 28], 'caixa-essencial': [56, 19, 25], 'caixa-fruta': [56, 18, 26], 'caixa-legumes': [59, 11, 30] }[p.id] || [57, 16, 27];
@@ -178,8 +182,16 @@ function otag(p, big = false) {
   if (p.cat === 'caixas') return `<span class="otag${big ? ' big' : ''}"><b>${T('Vários agricultores', 'Several farmers')}</b><span>${T('Composição muda todas as semanas', 'The selection changes every week')}</span></span>`;
   const f = F(p.farmer) || F((offersOf(p)[0] || {}).farmer), h = harvestOf(p), more = offersOf(p).filter(o => o.farmer !== (f && f.id)).map(o => o.farmer).filter((x, i, a) => a.indexOf(x) === i).length;
   if (!f) return '';
-  const line = h ? `${T('Colheita', 'Harvested')}: ${fdate(h)}${isStored(p) ? T(', conservação em frio', ', cold-stored') : ''}` : `${T('Fora de época, volta em', 'Out of season, back in')} ${monthName(p.season[0])}`;
+  const line = h ? `${T('Colheita mais recente', 'Latest harvest')}: ${fdate(h)}${isStored(p) ? T(', conservação em frio', ', cold-stored') : ''}` : `${T('Fora de época, volta em', 'Out of season, back in')} ${monthName(p.season[0])}`;
   return `<span class="otag${big ? ' big' : ''}${h ? '' : ' off'}"><b>${esc(f.name)}, ${esc(f.place)}${more ? ` ${T(`e mais ${more}`, `and ${more} more`)}` : ''}</b><span>${line}</span></span>`;
+}
+/* foto de capa do agricultor: um dos desenhos ("art:<cultura>:<semente>") ou uma fotografia enviada; sem capa, o desenho da quinta */
+const COVER_ART = [['pera', 0], ['macaGala', 1], ['alface', 2], ['laranja', 12], ['uvaBranca', 11], ['cereja', 9], ['castanha', 13], ['mirtilo', 6], ['banana', 14], ['abobora', 7]];
+function farmPic(f, cls = '') {
+  const c = f && f.cover;
+  if (c && /^art:/.test(c)) { const [, crop, seed] = c.split(':'); return farmSVG(+seed || 0, crop, cls); }
+  if (c) return `<img class="cover-img ${cls}" src="${esc(c)}" alt="" loading="lazy" decoding="async">`;
+  return farmSVG((f && f.seed) || 0, (f && f.crop) || 'pera', cls);
 }
 /* ícone de cada produto: ficheiro img/produtos/<id>.svg (pode ser editado ou substituído) */
 function artFor(p, cls = '') { if (p.custom && !p.icon && !p.photo) return crateSVG(p.items || [], 'picon crate ' + cls); return p.photo ? `<img class="picon photo ${cls}" src="${esc(p.photo)}" alt="" loading="lazy" decoding="async">` : `<img class="picon ${cls}" src="${R}img/produtos/${p.icon || p.id}.svg" alt="" loading="lazy" decoding="async">`; }
@@ -292,7 +304,7 @@ function pcard(p) {
 function fcard(f, withStory = false) {
   const crops = ofFarmer(f.id).map(p => L(p.name)).slice(0, 4).join(', ');
   return `<article class="fcard" data-farmer="${f.id}">
-    <div class="pic">${farmSVG(f.seed, f.crop)}</div>
+    <div class="pic">${farmPic(f)}</div>
     <div class="fb">
       <h3><a class="fname" href="${farmerHref(f)}">${esc(f.name)}</a></h3>
       <span class="where">${icon('pin', 18)}${esc(f.farm)}, ${esc(f.place)}</span>
@@ -373,6 +385,7 @@ function header() {
       <div class="hdr-actions">
         <a class="hdr-help" href="${href('contacto')}"><span>${T('Ajuda? Ligue-nos', 'Help? Call us')}</span><strong>${PHONE}</strong></a>
         ${langToggle()}
+        ${typeof bellButton === 'function' ? bellButton() : ''}
         <a class="acct-link" href="${href(!u ? 'entrar' : u.partner ? 'parceiro' : 'conta')}" aria-label="${u ? T('A minha conta', 'My account') : T('Entrar', 'Sign in')}${newReq ? `, ${newReq} ${T('pedidos novos', 'new requests')}` : ''}">${icon('user', 24)}<span>${u ? esc(u.name.split(' ')[0]) : T('Entrar', 'Sign in')}</span>${newReq ? `<span class="count">${newReq}</span>` : ''}</a>
         <button class="icon-btn" data-cart-open aria-label="${T('Abrir cabaz', 'Open basket')}, ${count} ${T('artigos', 'items')}">${icon('basket', 26)}${count ? `<span class="count">${count}</span>` : ''}</button>
       </div>
@@ -400,7 +413,7 @@ function footer() {
         <p class="ftr-contact">${T('Linha Daqui', 'Daqui line')}: <strong>${PHONE}</strong><br>${EMAIL}</p></div>
       <div><h3>${T('Loja', 'Shop')}</h3><ul><li><a href="${href('produtos')}">${T('Todos os produtos', 'All products')}</a></li><li><a href="${href('subscricao')}">${T('Caixas da Estação', 'Seasonal boxes')}</a></li><li><a href="${href('colhe-connosco')}">${JTH()}</a></li><li><a href="${href('restaurantes')}">${T('Selo Daqui', 'Daqui seal')}</a></li></ul></div>
       <div><h3>${T('Ajudamos com', 'We can help with')}</h3><ul><li><a href="${href('contacto')}">${T('Incidências e reembolsos', 'Issues and refunds')}</a></li><li><a href="${href('conta')}">${T('A minha conta', 'My account')}</a></li><li><a href="${href('faq')}">${T('Perguntas frequentes', 'FAQ')}</a></li><li><a href="${href('agricultores', 'adesao=1')}">${T('Inscrever-me como agricultor', 'Sign up as a farmer')}</a></li></ul></div>
-      <div><h3>${T('Políticas', 'Policies')}</h3><ul><li><a href="${href('politicas', 'sec=termos')}">${T('Termos de utilização', 'Terms of use')}</a></li><li><a href="${href('politicas', 'sec=privacidade')}">${T('Privacidade', 'Privacy')}</a></li><li><a href="${href('politicas', 'sec=cookies')}">Cookies</a></li><li><a href="${href('politicas', 'sec=devolucoes')}">${T('Devoluções', 'Refunds')}</a></li></ul></div>
+      <div><h3>${T('Políticas', 'Policies')}</h3><ul><li><a href="${href('termos')}">${T('Termos de utilização', 'Terms of use')}</a></li><li><a href="${href('privacidade')}">${T('Privacidade', 'Privacy')}</a></li><li><a href="${href('cookies')}">Cookies</a></li><li><a href="${href('devolucoes')}">${T('Devoluções', 'Refunds')}</a></li></ul></div>
       <div><h3>${T('Pagamentos', 'Payments')}</h3><div class="pay"><span>MB WAY</span><span>Multibanco</span><span>Visa</span><span>Mastercard</span><span>PayPal</span><span>${T('Na entrega', 'On delivery')}</span></div>
         <h3 class="mt">${T('Siga-nos', 'Follow us')}</h3><div class="socials">${soc}</div></div>
     </div>
@@ -416,11 +429,12 @@ function addToCart(id, opts = {}, qty = 1) {
   const p = P(id); let price = p.price; id = p.id; opts = Object.assign({}, opts);
   if (p.cat === 'caixas') { const sz = BOX_SIZES[id].find(s => s.s === (opts.size || 'P')) || BOX_SIZES[id][0]; price = sz.price; opts.size = sz.s; opts.kg = sz.kg; delete opts.bio; }
   else { const bio = opts.bio === undefined ? defaultBio(p) : !!opts.bio && hasBio(p); if (bio) opts.bio = true; else delete opts.bio; price = variantPrice(p, bio); qty = Math.max(qtyStep(p), round2(qty)); }
+  if (typeof LOTS !== 'undefined' && tracksStock(p)) { const room = round2(stockOf(p) - inCart(id)); if (room <= 0) { toast(T(`${L(p.name)}: já tem no cabaz tudo o que há em stock.`, `${L(p.name)}: your basket already has all the stock.`)); return; } if (qty > room) { qty = room; toast(T(`Só restam ${stockText(p, stockOf(p))} de ${L(p.name)}.`, `Only ${stockText(p, stockOf(p))} of ${L(p.name)} left.`)); } }
   const key = [id, opts.size || '', opts.bio ? 'bio' : ''].join('|'); const ex = cart.find(i => i.key === key);
   if (ex) ex.qty = round2(ex.qty + qty); else cart.push({ key, id, qty, price, opts });
   saveCart(); refreshCartUI(); toast(T(`Adicionado ao cabaz: ${L(p.name)}`, `Added to your basket: ${L(p.name)}`));
 }
-function cartTotals() { const sub = round2(cart.reduce((s, i) => s + i.price * i.qty, 0)); const del = cart.length && deliver === 'home' ? DELIVERY_FEE : 0; return { sub, del, tot: sub + del }; }
+function cartTotals() { if (!cart.length) return { sub: 0, del: 0, tot: 0, boxes: { fee: 0 } }; const q = quote(cart, deliver, currentUser(), null, false); return { sub: q.sub, del: q.ship.fee, tot: q.total, boxes: q.boxes, why: q.ship.why }; }
 function drawerHTML() {
   const t = cartTotals();
   const items = cart.map(i => { const p = P(i.id); return `<div class="citem"><a class="thumb" href="${productHref(p)}" tabindex="-1">${artFor(p)}</a>
@@ -432,10 +446,11 @@ function drawerHTML() {
     <div class="promo">${crateSVG('mista')}<div><b>${T('Prefere receber todas as semanas?', 'Want it every week?')}</b><span class="small">${T('Subscreva uma Caixa da Estação com preço garantido durante 12 meses.', 'Subscribe to a Seasonal Box with a 12-month price guarantee.')}</span><br><a class="link" href="${href('subscricao')}">${T('Ver subscrições', 'See subscriptions')}</a></div></div>
     ${cart.length ? items : `<div class="empty"><h3>${T('O seu cabaz está vazio', 'Your basket is empty')}</h3><p class="muted">${T('Comece pelos essenciais da semana.', 'Start with this week\'s essentials.')}</p><a class="btn btn-green" href="${href('produtos')}">${T('Ver produtos', 'Browse the shop')}</a></div>`}
     ${cart.length ? `<fieldset class="plain"><legend class="lbl">${T('Como quer receber?', 'How would you like it?')}</legend>
-      <div class="radios"><label><input type="radio" name="deliver" value="pickup"${deliver === 'pickup' ? ' checked' : ''}>${T('Levantamento grátis', 'Free pick-up')}</label><label><input type="radio" name="deliver" value="home"${deliver === 'home' ? ' checked' : ''}>${T('Entrega em casa', 'Home delivery')} (+${money(DELIVERY_FEE)})</label></div></fieldset>
+      <div class="radios"><label><input type="radio" name="deliver" value="pickup"${deliver === 'pickup' ? ' checked' : ''}>${T('Ponto de recolha', 'Pick-up point')} (+${feeText('pickup')})</label><label><input type="radio" name="deliver" value="home"${deliver === 'home' ? ' checked' : ''}>${T('Entrega em casa', 'Home delivery')} (+${feeText('home')})</label></div>
+      <p class="small muted">${t.sub < SETTINGS.freeFrom ? T(`Faltam ${money(SETTINGS.freeFrom - t.sub)} para os portes grátis.`, `${money(SETTINGS.freeFrom - t.sub)} more for free delivery.`) : T('Portes grátis nesta encomenda.', 'Free delivery on this order.')}</p></fieldset>
       <p class="note small">${icon('clock', 20)}<span>${T(`Distribuímos à quinta-feira e ao sábado. Se encomendar agora: ${slotLabel(slotOptions()[0])}.`, `We deliver on Thursdays and Saturdays. Order now for ${slotLabel(slotOptions()[0])}.`)}</span></p>` : ''}
   </div>
-  ${cart.length ? `<div class="df"><div class="sum"><span>${T('Subtotal', 'Subtotal')}</span><span>${money(t.sub)}</span></div><div class="sum"><span>${T('Entrega', 'Delivery')}</span><span>${t.del ? money(t.del) : T('Grátis', 'Free')}</span></div><div class="sum tot"><span>Total</span><span>${money(t.tot)}</span></div>
+  ${cart.length ? `<div class="df"><div class="sum"><span>${T('Subtotal', 'Subtotal')}</span><span>${money(t.sub)}</span></div>${t.boxes.fee ? `<div class="sum"><span>${T('Caixas de cartão', 'Cardboard boxes')} (${cardboardText(t.boxes)})</span><span>${money(t.boxes.fee)}</span></div>` : ''}<div class="sum"><span>${T('Entrega', 'Delivery')}</span><span>${t.del ? money(t.del) : T('Grátis', 'Free')}</span></div><div class="sum tot"><span>Total</span><span>${money(t.tot)}</span></div>
     <a class="btn btn-green btn-block" href="${href('finalizar')}">${T('Finalizar encomenda', 'Check out')}</a></div>` : ''}`;
 }
 function refreshCartUI() {
@@ -592,8 +607,10 @@ new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(applyInlineStyle
 document.addEventListener('DOMContentLoaded', () => {
   $('#drawer').setAttribute('inert', '');
   if (PAGE_DOC === 'app') return;   // a app para telemóvel arranca em js/app-movel.js
-  const first = () => { render(); if (location.hash) setTimeout(() => document.getElementById(location.hash.slice(1))?.scrollIntoView(), 60); };
+  let done = false;
+  const first = () => { done = true; clearTimeout(slow); if (!NUVEM.on) loadLocalExtras(); render(); document.body.classList.add('pronto'); if (location.hash) setTimeout(() => document.getElementById(location.hash.slice(1))?.scrollIntoView(), 60); };
+  /* "A carregar…" só aparece se os dados demorarem (com a cópia do separador, a página desenha logo) */
+  const slow = setTimeout(() => { if (!done) $('#app').innerHTML = `<div class="loading-page" role="status"><img src="${LOGO_GOLD}" alt="Daqui" width="140"><p>${T('A carregar…', 'Loading…')}</p></div>`; }, 250);
   if (!NUVEM.configured) return first();
-  $('#app').innerHTML = `<div class="loading-page" role="status"><img src="${LOGO_GOLD}" alt="Daqui" width="140"><p>${T('A carregar…', 'Loading…')}</p></div>`;
   NUVEM.start().then(first, first);
 });

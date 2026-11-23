@@ -47,16 +47,17 @@ PAGES.agricultor = () => {
   const days = HARVEST_DAYS.filter(h => h.farmer === f.id && !harvestPast(h));
   const html = `${crumbs([[T('Os nossos agricultores', 'Our farmers'), 'agricultores'], [f.name, '']])}
   <section class="wrap farmer-hero">
-    <div class="fh-pic">${farmSVG(f.seed, f.crop)}</div>
+    <div class="fh-pic">${farmPic(f)}</div>
     <div><h1>${esc(f.name)}</h1>
       <p class="where big">${icon('pin', 20)}${esc(f.farm)}, ${esc(f.place)} (${regionName(f.region)})</p>
-      <p class="muted">${T('Agricultor desde', 'Farming since')} ${f.since}</p>
+      ${f.since ? `<p class="muted">${T('Agricultor desde', 'Farming since')} ${f.since}</p>` : ''}
       <p class="lead mt-s">${esc(L(f.story))}</p></div>
   </section>
-  <section class="sec-tight"><div class="wrap farm-layout rev">
-    <div><h2 class="mb">${T('Produtos', 'Produce')}</h2><div class="grid">${prods.map(pcard).join('')}</div>
-      ${days.length ? `<h2 class="mt-l mb">${JTH()}</h2><div class="days">${days.map(dayCard).join('')}</div>` : ''}</div>
-    <div class="map-col"><div class="map-sticky"><h2 class="sr">${T('Localização', 'Location')}</h2>${portugalMapSVG(farmersForMap(), lang, f.id)}</div></div>
+  <section class="sec-tight"><div class="wrap">
+    <h2 class="mb">${T('Produtos', 'Produce')}</h2>
+    <div class="farm-layout rev farmer-prods"><div class="grid">${prods.map(pcard).join('')}</div>
+      <div class="map-col"><div class="map-sticky"><h2 class="sr">${T('Localização', 'Location')}</h2>${portugalMapSVG(farmersForMap(), lang, f.id)}</div></div></div>
+    ${days.length ? `<h2 class="mt-l mb">${JTH()}</h2><div class="days">${days.map(dayCard).join('')}</div>` : ''}
   </div></section>
   <section class="sec sec-sage"><div class="wrap"><div class="sec-head"><h2>${T('Outros agricultores', 'Other farmers')}</h2>${railUI('farm')}</div>${rail('farm', FARMERS.filter(x => x.id !== f.id).map(x => fcard(x)))}</div></section>`;
   return { title: f.name, html };
@@ -75,9 +76,8 @@ PAGES.restaurantes = () => {
     <h2>${T('Restaurantes parceiros em Aveiro', 'Partner restaurants in Aveiro')}</h2>
     <p class="lead mt-s mb">${T('Restaurantes com o Selo Daqui na cidade de Aveiro, e o prato da semana feito com produtos dos nossos agricultores.', 'Restaurants with the Daqui seal in Aveiro, and this week\'s dish made with our farmers\' produce.')}</p>
     <div class="rest-layout">
-      <div class="mapbox">${aveiroMapSVG(RESTAURANTS, lang, '')}</div>
-      <ol class="rest-list">${RESTAURANTS.map((r, i) => `<li id="${r.id}" class="rest" data-rest-card="${r.id}"><span class="rn">${i + 1}</span><div><h3>${esc(r.name)}</h3><p class="small muted">${esc(L(r.kind))}. ${esc(L(r.area))}</p>
-        <p class="small"><b>${T('Prato da semana', 'Dish of the week')}:</b> ${esc(L(r.dish))}</p>${(r.dishes || []).length ? `<p class="small"><b>${T('No menu com produtos Daqui', 'On the menu with Daqui produce')}:</b> ${r.dishes.map(x => esc(L(x))).join(', ')}</p>` : ''}<p class="small muted">${T('Selo desde', 'Seal since')} ${fdate(r.since + '-15', { month: 'long', year: 'numeric' })}</p></div></li>`).join('')}</ol>
+      <div class="map-col"><div class="mapbox map-sticky">${aveiroMapSVG(restaurantsShown().map(r => Object.assign({}, r, { href: restHref(r) })), lang, '')}</div></div>
+      <div>${restFilters()}${restListHTML(restaurantsShown())}</div>
     </div>
     <p class="src">${T('Restaurantes e localizações fictícios, para demonstração.', 'Fictional restaurants and locations, for demonstration.')}</p>
   </div></section>
@@ -93,7 +93,6 @@ PAGES.restaurantes = () => {
   </div></section>
   <section class="sec"><div class="wrap"><h2 class="mb">${T('Como obter o selo', 'How to get the seal')}</h2>
     <ol class="steps"><li><h3>${T('Registe o restaurante', 'Register your restaurant')}</h3><p>${T('Preencha o formulário ou ligue-nos.', 'Fill in the form or give us a call.')}</p></li><li><h3>${T('Compre pela Daqui', 'Buy through Daqui')}</h3><p>${T('Fruta e legumes entregues na sua cozinha todas as semanas.', 'Fruit and vegetables delivered to your kitchen every week.')}</p></li><li><h3>${T('Verificação de origem', 'Origin check')}</h3><p>${T('Uma entidade certificadora confirma a origem e as datas.', 'A certification body confirms origin and dates.')}</p></li><li><h3>${T('Receba o selo', 'Receive the seal')}</h3><p>${T('Autocolante para a porta, texto para o menu e lugar no mapa.', 'A door sticker, menu wording and a place on the map.')}</p></li></ol>
-    <p class="note mt">${icon('euro', 22)}<span>${T('A adesão ao selo tem uma quota mensal, que anunciaremos no lançamento.', 'The seal has a monthly membership fee, which we will announce at launch.')}</span></p>
   </div></section>
   <section class="sec sec-sage" id="pedir-selo"><div class="wrap join">
     <div><h2>${T('Pedir o Selo Daqui', 'Apply for the Daqui seal')}</h2><p class="lead mt-s">${T('Deixe os dados do restaurante e entramos em contacto.', 'Leave your restaurant\'s details and we\'ll get in touch.')}</p></div>
@@ -422,6 +421,7 @@ function chatPoll() {
   chatTimer = setInterval(() => {
     const open = (PAGE_DOC === 'app' && /^#\/(mensagens|g\/mensagens)/.test(location.hash)) || chatOpen || (PAGE === 'conta' && typeof adminTab !== 'undefined' && adminTab === 'mensagens' && currentUser()?.role === 'admin');
     if (!open || document.visibilityState !== 'visible') { if (!open) clearInterval(chatTimer); return; }
+    if (NUVEM.live) return;   // com tempo real as mensagens novas chegam sozinhas (js/nuvem.js)
     const before = JSON.stringify(MESSAGES.map(m => [m.id, m.read]));
     NUVEM.loadMessages().then(() => { if (JSON.stringify(MESSAGES.map(m => [m.id, m.read])) === before) return; chatAfterNew(); });
   }, 6000);

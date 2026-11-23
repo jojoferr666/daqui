@@ -81,7 +81,7 @@ PAGES.conta = () => {
   let changed = false; (u.subs || []).forEach(s => { if (refreshSub(s).changed) changed = true; }); if (changed) saveUsers();
   const nova = (u.subs || []).find(s => s.id === QS.get('nova'));
   const subCard = s => {
-    const p = P(s.box), cur = boxCurrentPrice(s.box, s.size), lockEnd = addDays(parseISO(s.start), 365), fee = s.deliver === 'home' ? DELIVERY_FEE : 0;
+    const p = P(s.box), cur = boxCurrentPrice(s.box, s.size), lockEnd = addDays(parseISO(s.start), 365), fee = (q => q.ship.fee + q.boxes.fee)(quote([{ id: s.box, qty: 1, price: cur, opts: { kg: s.kg } }], s.deliver, u, null, false));
     const exclude = (u.exclude || []).map(id => P(id) ? L(P(id).name) : id).join(', ');
     return `<article class="subcard${s.status === 'pausada' ? ' paused' : ''}">
       <div class="sc-art">${artFor(p)}</div>
@@ -108,14 +108,14 @@ PAGES.conta = () => {
       <div><div class="row-gap"><b>${o.num}</b><span class="status ${st === 4 ? 'pausada' : st === 3 ? 'ativa' : 'prog'}">${stageName(o)}</span></div>
         <p class="small muted">${T('Feita a', 'Placed on')} ${fdate(o.created, { day: 'numeric', month: 'long', year: 'numeric' })}. ${o.deliver === 'home' ? T('Entrega', 'Delivery') : T('Levantamento', 'Pick-up')}: ${slotLabel(o.slot)}.</p>
         <p class="small">${esc(names.slice(0, 4).join(', '))}${names.length > 4 ? ` ${T('e mais', 'and')} ${names.length - 4}` : ''}</p></div>
-      <div class="oc-side"><b>${money(o.total)}</b><a class="btn btn-line btn-sm c-campo" href="${href('contacto', 'encomenda=' + o.num)}">${T('Seguir', 'Track')}</a><button class="link small" data-reorder="${o.num}">${T('Repetir encomenda', 'Order again')}</button></div></article>`; };
+      <div class="oc-side"><b>${money(o.total)}</b><a class="btn btn-line btn-sm c-campo" href="${href('contacto', 'encomenda=' + o.num)}">${T('Seguir', 'Track')}</a><button class="link small" data-reorder="${o.num}">${T('Repetir encomenda', 'Order again')}</button><button class="link small" data-invoice="order|${o.num}">${icon('receipt', 14)} ${T('Fatura', 'Invoice')}</button></div>${reviewPrompts(u, o)}</article>`; };
   /* registos do Colhe Connosco: aparecem nas encomendas, com o valor pago e o identificador */
   const recCard = ({ h, d, rec }) => { const f = F(d.farmer) || { farm: d.farmer, place: '' }, pr = dayProduct(d);
     return `<article class="ordcard cc-rec"><div class="oc-thumbs"><span class="thumb">${pr ? artFor(pr) : icon('sprout', 28)}</span></div>
       <div><div class="row-gap"><b>${recId(h, d, u.username)}</b><span class="status ativa">${JTH()}</span></div>
         <p class="small muted">${T('Colhido a', 'Picked on')} ${fdate(d.date, { day: 'numeric', month: 'long', year: 'numeric' })}, ${esc(f.farm)}${f.place ? ', ' + esc(f.place) : ''}.</p>
         <p class="small">${recText(rec, d)}</p></div>
-      <div class="oc-side"><b>${rec.price != null ? money(rec.price) : '–'}</b><a class="link small" href="#colhe">${T('Ver o dia', 'See the day')}</a></div></article>`; };
+      <div class="oc-side"><b>${rec.price != null ? money(rec.price) : '–'}</b><a class="link small" href="#colhe">${T('Ver o dia', 'See the day')}</a>${rec.price != null ? `<button class="link small" data-invoice="colhe|${d.id}|${u.username}">${icon('receipt', 14)} ${T('Fatura', 'Invoice')}</button>` : ''}</div></article>`; };
   const ordFeed = myOrders.map(o => ({ at: String(o.created), html: orderCard(o) })).concat(harvestRecords(u).map(x => ({ at: x.d.date, html: recCard(x) }))).sort((a, b) => b.at.localeCompare(a.at));
   /* Colhe Connosco: inscrições, avaliação (abre no início do dia e fecha 48 h depois do fim) e registo da colheita feito pela equipa */
   const harvRow = h => { const dd = hDay(h); if (!dd) return ''; const f = F(dd.farmer) || { farm: dd.farmer, place: '' }, started = harvestStarted(dd), open = harvestRateOpen(dd), rec = h.record, k = dd.id.replace(/[^a-zA-Z0-9-]/g, '_');
@@ -144,13 +144,14 @@ PAGES.conta = () => {
   <div class="wrap account">
     ${nova ? `<p class="note done" role="status">${icon('check', 22)}<span><b>${T('Subscrição confirmada', 'Subscription confirmed')}: ${esc(L(P(nova.box).name))}.</b> ${T('Primeira entrega', 'First delivery')}: ${slotLabel(nova.first)}. ${T('Preço guardado durante 12 meses.', 'Price saved for 12 months.')}</span></p>` : ''}
     ${u.role === 'admin' ? adminPanel() : `
-    <nav class="acc-nav" aria-label="${T('Secções da conta', 'Account sections')}">${[['encomendas', 'box', T('Encomendas', 'Orders')], ['subscricoes', 'repeat', T('Subscrições', 'Subscriptions')], ['colhe', 'sprout', JTH()], ['preferencias', 'heart', T('Favoritos e avisos', 'Favourites and reminders')], ['dados', 'user', T('Dados e palavra‑passe', 'Details and password')]].map(([k, ic, n]) => `<a class="acc-tab" href="#${k}">${icon(ic, 20)}<span>${n}</span></a>`).join('')}<button class="acc-tab chat" data-chat-open>${icon('chat', 20)}<span>${T('Falar com a Daqui', 'Talk to Daqui')}</span></button></nav>
+    <nav class="acc-nav" aria-label="${T('Secções da conta', 'Account sections')}">${[['encomendas', 'box', T('Encomendas', 'Orders')], ['subscricoes', 'repeat', T('Subscrições', 'Subscriptions')], ['colhe', 'sprout', JTH()], ['preferencias', 'heart', T('Favoritos e avisos', 'Favourites and reminders')], ['carteira', 'wallet', T('Saldo e Cooperativa', 'Balance and Co-op')], ['faturas', 'receipt', T('Faturas', 'Invoices')], ['dados', 'user', T('Dados e palavra‑passe', 'Details and password')], ['aspeto', 'palette', T('Aspeto', 'Appearance')]].map(([k, ic, n]) => `<a class="acc-tab" href="#${k}">${icon(ic, 20)}<span>${n}</span></a>`).join('')}<button class="acc-tab chat" data-chat-open>${icon('chat', 20)}<span>${T('Falar com a Daqui', 'Talk to Daqui')}</span></button></nav>
     <section class="acc-sec" id="encomendas"><div class="row-between mb-s"><h2>${T('Histórico de encomendas', 'Order history')}</h2><a class="btn btn-green btn-sm" href="${href('produtos')}">${T('Nova encomenda', 'New order')}</a></div>
       ${ordFeed.length ? ordFeed.map(x => x.html).join('') : `<p class="muted">${T('Ainda não fez nenhuma encomenda com esta conta.', 'You haven\'t placed any orders with this account yet.')}</p>`}</section>
     <section class="acc-sec" id="subscricoes"><div class="row-between mb-s"><h2>${T('As minhas subscrições', 'My subscriptions')}</h2><a class="btn btn-green btn-sm" href="${href('subscricao')}">${T('Nova subscrição', 'New subscription')}</a></div>
       ${(u.subs || []).length ? u.subs.map(subCard).join('') : `<div class="empty"><h3>${T('Ainda não tem subscrições', 'No subscriptions yet')}</h3><p class="muted">${T('Escolha uma Caixa da Estação e receba todas as semanas, com preço garantido durante 12 meses.', 'Pick a Seasonal Box and get it every week, with a 12-month price guarantee.')}</p><a class="btn btn-green" href="${href('subscricao')}">${T('Ver caixas', 'See boxes')}</a></div>`}</section>
     <section class="acc-sec" id="colhe"><div class="row-between mb-s"><h2>${JTH()}</h2><a class="btn btn-line btn-sm c-campo" href="${href('colhe-connosco')}">${T('Ver próximos dias', 'See upcoming days')}</a></div>
       ${harvRows ? `<ul class="hlist">${harvRows}</ul>` : `<p class="muted">${T('Ainda não está inscrito em nenhum dia.', 'You are not signed up for any day yet.')}</p>`}</section>
+    ${accWalletSection(u)}${accInvoicesSection(u)}
     <section class="acc-sec" id="preferencias"><h2>${T('Preferências para as caixas', 'Box preferences')}</h2>
       <p class="muted mt-s">${T('Valem para todas as caixas que receber: nas subscrições e nas caixas que comprar uma vez. A equipa Daqui vê estas preferências em cada encomenda de caixa.', 'They apply to every box you get: subscriptions and one-off box orders. The Daqui team sees these preferences on every box order.')}</p>
       ${BACK ? `<p class="note small mt-s">${icon('repeat', 20)}<span>${T('Quando terminar, volte para confirmar a subscrição.', 'When you are done, go back to confirm your subscription.')} <a class="btn btn-green btn-sm" href="${href(BACK, 'retomar=1')}">${T('Voltar à subscrição', 'Back to the subscription')}</a></span></p>` : ''}
@@ -170,7 +171,8 @@ PAGES.conta = () => {
         ${(lst => lst.length ? `<div class="row-gap mt-s"><label class="sr" for="notify-add">${T('Produto para avisar', 'Product to be notified about')}</label><select id="notify-add" class="sel">${['fruta', 'legumes'].map(c => `<optgroup label="${catName(c)}">${lst.filter(p => p.cat === c).map(p => `<option value="${p.id}">${esc(L(p.name))} (${inSeason(p) ? T('sem stock', 'out of stock') : T('volta em', 'back in') + ' ' + monthName(p.season[0], 'short')})</option>`).join('')}</optgroup>`).join('')}</select><button class="btn btn-line btn-sm c-campo" data-notify-add>${icon('bell', 16)}${T('Avisar-me', 'Notify me')}</button></div>` : '')(PRODUCTS.filter(p => p.cat !== 'caixas' && !available(p) && !(u.notify || []).includes(p.id)).sort((a, b) => L(a.name).localeCompare(L(b.name))))}</div></section>
 `}
     <section class="acc-sec" id="dados"><h2 class="mb-s">${T('Dados da conta', 'Account details')}</h2>
-      <dl class="dl cols2"><div><dt>${T('Nome', 'Name')}</dt><dd>${esc(u.name)}</dd></div><div><dt>${T('Nome de utilizador', 'Username')}</dt><dd>${esc(u.username)}</dd></div><div><dt>${T('Telemóvel', 'Mobile')}</dt><dd>${esc(u.phone)}</dd></div><div><dt>${T('Cliente desde', 'Customer since')}</dt><dd>${fdate(u.created, { day: 'numeric', month: 'long', year: 'numeric' })}</dd></div></dl>
+      <dl class="dl cols2"><div><dt>${T('Nome', 'Name')}</dt><dd>${esc(u.name)}</dd></div><div><dt>${T('Nome de utilizador', 'Username')}</dt><dd>${esc(u.username)}</dd></div><div><dt>${T('Cliente desde', 'Customer since')}</dt><dd>${fdate(u.created, { day: 'numeric', month: 'long', year: 'numeric' })}</dd></div>${isMember(u) ? `<div><dt>${T('Cooperativa', 'Co-op')}</dt><dd>${T('Membro até', 'Member until')} ${fdate(parseISO(u.coopUntil))}</dd></div>` : ''}</dl>
+      ${contactForm(u)}
       ${passBox(u)}
       ${u.role === 'admin' ? '' : `<h3 class="mt">${T('Morada de entrega', 'Delivery address')}</h3>
       <p class="small muted">${T('É usada nas encomendas e subscrições com entrega em casa.', 'Used for orders and subscriptions with home delivery.')}</p>
@@ -180,6 +182,7 @@ PAGES.conta = () => {
         <p class="err" hidden></p>
         <div class="row-btns"><button class="btn btn-green btn-sm" type="submit">${addr ? T('Atualizar morada', 'Update address') : T('Guardar morada', 'Save address')}</button>${addr ? `<button type="button" class="btn btn-line btn-sm c-tomato" data-addr-rm>${T('Apagar morada', 'Delete address')}</button>` : ''}</div>
       </form>`}</section>
+    ${accLookSection()}
   </div><div class="spacer"></div>`;
   return { title: T('A minha conta', 'My account'), html, after: () => { const sec = QS.get('sec'); if (sec) setTimeout(() => document.getElementById(sec)?.scrollIntoView(), 60); } };
 };

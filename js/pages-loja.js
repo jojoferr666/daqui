@@ -105,12 +105,7 @@ PAGES.inicio = () => {
     </div>
   </div></section>
 
-  <section class="sec sec-gold"><div class="wrap join">
-    <div><h2 class="c-campo">${T('Seja membro fundador', 'Become a founding member')}</h2>
-      <p class="lead c-folha mt-s">${T('Estamos a abrir a lista de membros fundadores. Reserve os primeiros três meses de caixas e garanta o preço de fundador.', 'We are opening our founding-members list. Reserve your first three months of boxes and lock in the founder price.')}</p>
-      <p class="mt-s">${T('Também por telefone', 'Also by phone')}: <strong>${PHONE}</strong></p></div>
-    ${foundersForm()}
-  </div></section>
+  ${coopBand()}
 
   <section class="sec-tight"><div class="wrap row-between">
     <div><h2>${T('Siga-nos em @daqui.pt', 'Follow us at @daqui.pt')}</h2><p class="muted mt-s">${T('Histórias dos agricultores, produtos da época e datas do Colhe Connosco.', 'Farmer stories, seasonal produce and Join the Harvest dates.')}</p></div>
@@ -238,11 +233,12 @@ PAGES.produto = () => {
         <div class="panel"><h3>${T('Subscrever', 'Subscribe')}</h3><p class="small muted">${T('Todas as semanas, quinzenas ou meses. Preço garantido durante 12 meses.', 'Every week, fortnight or month. Price guaranteed for 12 months.')}</p><a class="btn btn-green btn-block" href="${href('subscricao/' + p.id, 'tamanho=' + sz.s)}">${icon('repeat', 18)}${T('Configurar subscrição', 'Set up subscription')}</a></div>
         <div class="panel"><h3>${T('Compra única', 'One-off')}</h3><p class="small muted">${T('Uma caixa, sem compromisso.', 'One box, no commitment.')}</p><button class="btn btn-line btn-block c-campo" data-pd-add="${p.id}">${icon('basket', 18)}${T('Adicionar ao cabaz', 'Add to basket')}</button></div>
       </div>`
-    : on && (p.outOfStock || noProducer(p)) ? `<div class="price"><strong class="big">${money(price)}</strong><span>${unitLabel(p.unit)}</span></div>
+    : on && soldOut(p) ? `<div class="price"><strong class="big">${money(price)}</strong><span>${unitLabel(p.unit)}</span></div>
       <div class="note">${icon('alert', 22)}<span>${noProducer(p) ? T('Sem stock: de momento nenhum agricultor o fornece.', 'Out of stock: no farmer supplies it at the moment.') : T('Esgotado esta semana. Volta assim que o agricultor tiver nova colheita.', 'Sold out this week. Back as soon as the farmer has a new harvest.')}</span></div>
       <button class="btn btn-green" data-notify="${p.id}" aria-pressed="${notifyOn(p.id)}">${icon('bell', 18)}${notifyOn(p.id) ? T('Aviso ativo', 'Reminder on') : T('Avisar-me quando houver stock', 'Notify me when back in stock')}</button>`
     : on ? `${bioChoice(p, pd.bio, 'data-pd-bio')}<div class="price"><strong class="big">${money(price)}</strong><span>${unitLabel(p.unit)}${hasBio(p) ? `, ${bioName(pd.bio).toLowerCase()}` : ''}</span></div>
       ${byKg(p) ? `<p class="small muted">${T('Pode encomendar ao meio quilo (por exemplo 2,5 kg).', 'You can order by the half kilo (for example 2.5 kg).')}</p>` : ''}
+      ${tracksStock(p) ? `<p class="stock-line small${stockOf(p) < 15 ? ' low' : ''}">${icon('basket', 16)}${stockOf(p) < 15 ? T(`Últimos ${stockText(p, stockOf(p))} em stock`, `Last ${stockText(p, stockOf(p))} in stock`) : T(`Em stock: ${stockText(p, stockOf(p))}`, `In stock: ${stockText(p, stockOf(p))}`)}</p>` : ''}
       <div class="row-gap"><div class="qty m0"><button data-pd-qty="-1" aria-label="${byKg(p) ? T('Menos meio quilo', 'Half a kilo less') : T('Menos um', 'One less')}">${icon('minus', 16)}</button><span>${fmtQty(pd.qty, p)}</span><button data-pd-qty="1" aria-label="${byKg(p) ? T('Mais meio quilo', 'Half a kilo more') : T('Mais um', 'One more')}">${icon('plus', 16)}</button></div>
         <button class="btn btn-green grow" data-pd-add="${p.id}">${icon('basket', 18)}${T('Adicionar ao cabaz', 'Add to basket')}</button></div>`
       : `<div class="note">${icon('calendar', 22)}<span>${T(`Fora de época. ${L(p.name)} volta em ${monthName(p.season[0])}.`, `Out of season. ${L(p.name)} is back in ${monthName(p.season[0])}.`)}</span></div>
@@ -262,11 +258,12 @@ PAGES.produto = () => {
       ${on ? `<div><p class="lbl">${T('Para onde vai o seu dinheiro', 'Where your money goes')}</p>${splitBar(p, false)}
         <div class="legend mt-s"><span><i class="lg-farm"></i>${T('Agricultor', 'Farmer')} ${a}%</span><span><i class="lg-store"></i>${T('Conservação e embalamento', 'Storage and packing')} ${b}%</span><span><i class="lg-daqui"></i>Daqui ${c}%</span></div>
         <p class="small muted mt-s">${T('Divisão ilustrativa.', 'Illustrative split.')} ${VAT_NOTE()}</p></div>` : ''}
-      ${isBox ? '' : nOffers ? `<div class="farmers-minis">${nOffers > 1 ? `<p class="lbl">${T(`Produzido por ${nOffers} agricultores`, `Grown by ${nOffers} farmers`)}</p>` : ''}${farmersOf(p).map(fid => { const x = F(fid), kinds = offersOf(p).filter(o => o.farmer === fid).map(o => bioName(o.organic).toLowerCase()); return `<a class="farmer-mini" href="${farmerHref(x)}"><span class="fm-pic">${farmSVG(x.seed, x.crop)}</span><span><b>${esc(x.name)}</b><br><span class="small muted">${esc(x.farm)}, ${esc(x.place)}${hasBio(p) && hasConv(p) ? ` · ${kinds.join(T(' e ', ' and '))}` : ''}</span><br><span class="link small">${T('Conhecer o agricultor', 'Meet the farmer')}</span></span></a>`; }).join('')}</div>`
+      ${isBox ? '' : nOffers ? `<div class="farmers-minis">${nOffers > 1 ? `<p class="lbl">${T(`Produzido por ${nOffers} agricultores`, `Grown by ${nOffers} farmers`)}</p>` : ''}${farmersOf(p).map(fid => { const x = F(fid), kinds = offersOf(p).filter(o => o.farmer === fid).map(o => bioName(o.organic).toLowerCase()); const lh = latestHarvest(p.id, fid); return `<a class="farmer-mini" href="${farmerHref(x)}"><span class="fm-pic">${farmPic(x)}</span><span><b>${esc(x.name)}</b><br><span class="small muted">${esc(x.farm)}, ${esc(x.place)}${hasBio(p) && hasConv(p) ? ` · ${kinds.join(T(' e ', ' and '))}` : ''}</span>${lh ? `<br><span class="small fm-harv">${icon('calendar', 14)}${T('Colheita mais recente', 'Latest harvest')}: ${fdate(lh)}</span>` : ''}<br><span class="link small">${T('Conhecer o agricultor', 'Meet the farmer')}</span></span></a>`; }).join('')}</div>`
         : `<p class="note mt-s">${icon('alert', 22)}<span>${T('De momento nenhum agricultor fornece este produto.', 'No farmer supplies this product at the moment.')}</span></p>`}
       ${productTabs(p)}
     </div>
   </section>
+  ${reviewsSection(p)}
   ${more.length ? `<section class="sec-tight"><div class="wrap"><h2 class="mb">${T('Mais de', 'More from')} ${esc(f.name)}</h2><div class="grid">${more.map(pcard).join('')}</div></div></section>` : ''}
   ${same.length ? `<section class="sec sec-sage"><div class="wrap"><div class="sec-head"><h2>${T('Também nesta época', 'Also in season')}</h2>${railUI('same')}</div>${rail('same', same.map(pcard))}</div></section>` : ''}`;
   return { title: L(p.name), html };
@@ -351,14 +348,15 @@ function makeCfg() {
 }
 let cfg = makeCfg();
 function subSummary() {
-  const p = P(PID), sz = BOX_SIZES[PID].find(s => s.s === cfg.size), fee = cfg.deliver === 'home' ? DELIVERY_FEE : 0;
+  const p = P(PID), sz = BOX_SIZES[PID].find(s => s.s === cfg.size), q = quote([{ id: PID, qty: 1, price: sz.price, opts: { kg: sz.kg } }], cfg.deliver, currentUser(), null, false), fee = q.ship.fee + q.boxes.fee;
   const per = { sem: 52 / 12, quinz: 26 / 12, mens: 13 / 12 }[cfg.freq], first = firstDelivery(cfg.day), lockEnd = addDays(today(), 365);
   return `<div class="sum-art">${artFor(p)}</div><h3>${esc(L(p.name))}</h3>
     <dl class="dl">
       <div><dt>${T('Tamanho', 'Size')}</dt><dd>${sizeName(sz.s)}, ${sz.kg} kg</dd></div>
       <div><dt>${T('Frequência', 'Frequency')}</dt><dd>${freqName(cfg.freq)}, ${dayName(cfg.day).toLowerCase()}</dd></div>
       <div><dt>${T('Primeira entrega', 'First delivery')}</dt><dd>${fdate(first, { weekday: 'long', day: 'numeric', month: 'long' })}</dd></div>
-      <div><dt>${cfg.deliver === 'home' ? T('Entrega em casa', 'Home delivery') : T('Levantamento', 'Pick-up')}</dt><dd>${cfg.deliver === 'home' ? money(fee) : T('Grátis', 'Free')}</dd></div>
+      ${q.boxes.fee ? `<div><dt>${T('Caixa de cartão', 'Cardboard box')} <span class="small muted">(${cardboardText(q.boxes)})</span></dt><dd>${money(q.boxes.fee)}</dd></div>` : ''}
+      <div><dt>${cfg.deliver === 'home' ? T('Entrega em casa', 'Home delivery') : T('Ponto de recolha', 'Pick-up point')}</dt><dd>${q.ship.fee ? money(q.ship.fee) : T('Grátis', 'Free')}</dd></div>
       <div class="tot"><dt>${T('Por entrega', 'Per delivery')}</dt><dd>${money(sz.price + fee)}</dd></div>
       <div><dt>${T('Por mês (aprox.)', 'Per month (approx.)')}</dt><dd>${money((sz.price + fee) * per)}</dd></div>
     </dl>
@@ -379,7 +377,7 @@ PAGES.subscrever = () => {
         <div class="seg">${['sem', 'quinz', 'mens'].map(f => `<button type="button" data-cfg="freq:${f}" aria-pressed="${cfg.freq === f}">${freqName(f)}</button>`).join('')}</div>
         <div class="seg mt-s">${['qui', 'sab'].map(dd => `<button type="button" data-cfg="day:${dd}" aria-pressed="${cfg.day === dd}">${dayName(dd)}</button>`).join('')}</div></fieldset>
       <fieldset><legend><span class="n">3</span>${T('Como recebe', 'How you receive it')}</legend>
-        <div class="radios"><label><input type="radio" name="cfg-deliver" value="pickup"${cfg.deliver === 'pickup' ? ' checked' : ''}>${T('Levantamento grátis', 'Free pick-up')}</label><label><input type="radio" name="cfg-deliver" value="home"${cfg.deliver === 'home' ? ' checked' : ''}>${T('Entrega em casa', 'Home delivery')} (+${money(DELIVERY_FEE)})</label></div>
+        <div class="radios"><label><input type="radio" name="cfg-deliver" value="pickup"${cfg.deliver === 'pickup' ? ' checked' : ''}>${T('Ponto de recolha', 'Pick-up point')} (+${feeText('pickup')})</label><label><input type="radio" name="cfg-deliver" value="home"${cfg.deliver === 'home' ? ' checked' : ''}>${T('Entrega em casa', 'Home delivery')} (+${feeText('home')})</label></div>
         ${cfg.deliver === 'pickup' ? `<div class="field mt-s"><label for="cfg-point">${T('Ponto de recolha', 'Collection point')}</label><select id="cfg-point" data-cfg-field="point">${PICKUP_POINTS.map(x => `<option${x === cfg.point ? ' selected' : ''}>${x}</option>`).join('')}</select></div>`
           : `<div class="field mt-s"><label for="cfg-address">${T('Morada', 'Address')}</label><input id="cfg-address" data-cfg-field="address" value="${esc(cfg.address)}" required autocomplete="street-address"></div>
              <div class="row"><div class="field"><label for="cfg-postal">${T('Código postal', 'Postcode')}</label><input id="cfg-postal" data-cfg-field="postal" value="${esc(cfg.postal)}" required autocomplete="postal-code" placeholder="3810-000"></div>
@@ -469,8 +467,10 @@ function productInfo(p) {
   const ship = `<dl class="dl">
       <div><dt>${T('Dias de distribuição', 'Delivery days')}</dt><dd>${T('Quinta-feira e sábado', 'Thursday and Saturday')}</dd></div>
       <div><dt>${T('Se encomendar agora', 'If you order now')}</dt><dd>${slotLabel(slots[0])}</dd></div>
-      <div><dt>${T('Entrega em casa', 'Home delivery')}</dt><dd>${money(DELIVERY_FEE)}, ${T('entre as', 'between')} ${DISTRIBUTION.windows.join(T(' ou ', ' or '))}</dd></div>
-      <div><dt>${T('Levantamento', 'Pick-up')}</dt><dd>${T('Grátis', 'Free')}: ${T('quinta', 'Thu')} ${DISTRIBUTION.days.qui.pickup}, ${T('sábado', 'Sat')} ${DISTRIBUTION.days.sab.pickup}</dd></div></dl>
+      <div><dt>${T('Entrega em casa', 'Home delivery')}</dt><dd>${feeText('home')}, ${T('entre as', 'between')} ${DISTRIBUTION.windows.join(T(' ou ', ' or '))}</dd></div>
+      <div><dt>${T('Ponto de recolha', 'Pick-up point')}</dt><dd>${feeText('pickup')}: ${T('quinta', 'Thu')} ${DISTRIBUTION.days.qui.pickup}, ${T('sábado', 'Sat')} ${DISTRIBUTION.days.sab.pickup}</dd></div>
+      <div><dt>${T('Portes grátis', 'Free delivery')}</dt><dd>${T(`a partir de ${money(SETTINGS.freeFrom)} e para membros da Cooperativa`, `over ${money(SETTINGS.freeFrom)} and for Co-op members`)}</dd></div>
+      <div><dt>${T('Caixas de cartão', 'Cardboard boxes')}</dt><dd>${T('5 kg 0,85 €; 10 kg 1,00 € (devolvidas na encomenda seguinte)', '5 kg €0.85; 10 kg €1.00 (refunded on your next order)')}</dd></div></dl>
     <ul class="checks mt-s">
       <li>${icon('calendar', 18)}<span>${T('Encomendas até terça-feira às 18h seguem na quinta; até quinta-feira às 18h seguem no sábado.', 'Orders by Tuesday 6 pm go out on Thursday; by Thursday 6 pm, on Saturday.')}</span></li>
       <li>${icon('pin', 18)}<span>${T('Entregamos nos concelhos de', 'We deliver in')} ${DISTRIBUTION.area.join(', ')}. ${T('Pontos de recolha', 'Collection points')}: ${PICKUP_POINTS.join(', ')}.</span></li>
@@ -488,13 +488,25 @@ function productTabs(p) {
 
 /* ---------------- FINALIZAR ENCOMENDA (/finalizar) ---------------- */
 const co = (() => { const u = currentUser(), sl = slotOptions();
-  return { deliver: store.get('daqui-deliver', 'pickup'), slot: sl[0].date, window: DISTRIBUTION.windows[0], point: PICKUP_POINTS[1], useSaved: !!(u && u.address), street: '', postal: '', town: '', saveAddr: true, name: '', phone: '', email: '', pay: 'mbway', notes: '' }; })();
+  return { deliver: store.get('daqui-deliver', 'pickup'), slot: sl[0].date, window: DISTRIBUTION.windows[0], point: PICKUP_POINTS[1], useSaved: !!(u && u.address), street: '', postal: '', town: '', saveAddr: true, name: '', phone: '', email: '', pay: 'mbway', notes: '', promo: '', useBalance: false, code: '', codeErr: '', stockErr: false }; })();
+const coPromo = () => (co.promo ? PROMOS.find(p => p.id === co.promo) : null);
+const coQuote = () => quote(cart.map(i => ({ id: i.id, qty: i.qty, price: i.price, opts: i.opts })), co.deliver, currentUser(), coPromo(), co.useBalance);
+/* linhas do resumo de preços (checkout, subscrição e faturas) */
+function priceLines(q, where) {
+  const why = { min: T(`grátis a partir de ${money(SETTINGS.freeFrom)}`, `free over ${money(SETTINGS.freeFrom)}`), coop: T('grátis para membros da Cooperativa', 'free for Co-op members'), promo: T('promoção', 'promotion') }[q.ship.why];
+  return `<div><dt>${T('Subtotal', 'Subtotal')}</dt><dd>${money(q.sub)}</dd></div>
+    ${q.discount ? `<div class="disc"><dt>${T('Desconto', 'Discount')} (${esc(L(q.promo.title))})</dt><dd>-${money(q.discount)}</dd></div>` : ''}
+    ${q.boxes.fee ? `<div><dt>${T('Caixas de cartão', 'Cardboard boxes')} <span class="small muted">(${cardboardText(q.boxes)})</span></dt><dd>${money(q.boxes.fee)}</dd></div>` : ''}
+    <div><dt>${where === 'home' ? T('Entrega em casa', 'Home delivery') : T('Entrega no ponto de recolha', 'Delivery to the pick-up point')}${why ? ` <span class="small muted">(${why})</span>` : ''}</dt><dd>${q.ship.fee ? money(q.ship.fee) : T('Grátis', 'Free')}</dd></div>`;
+}
 function coSummary() {
-  const t = cartTotals();
+  const q = coQuote();
   return `<h3>${T('Resumo', 'Summary')}</h3>
     <ul class="co-items">${cart.map(i => { const p = P(i.id); return `<li><span class="thumb">${artFor(p)}</span><span>${esc(L(p.name))}${i.opts.size ? ` (${sizeName(i.opts.size)})` : ''}${i.opts.bio ? ` (${T('biológico', 'organic')})` : ''}<br><span class="small muted">${fmtQty(i.qty, p)} × ${money(i.price)}${byKg(p) ? '/kg' : ''}</span></span><b>${money(round2(i.price * i.qty))}</b></li>`; }).join('')}</ul>
-    <dl class="dl"><div><dt>${T('Subtotal', 'Subtotal')}</dt><dd>${money(t.sub)}</dd></div><div><dt>${co.deliver === 'home' ? T('Entrega em casa', 'Home delivery') : T('Levantamento', 'Pick-up')}</dt><dd>${t.del ? money(t.del) : T('Grátis', 'Free')}</dd></div>
-      <div><dt>${T('Dia', 'Day')}</dt><dd>${slotLabel(co.slot)}</dd></div><div class="tot"><dt>Total</dt><dd>${money(t.tot)}</dd></div></dl>`;
+    <dl class="dl">${priceLines(q, co.deliver)}
+      <div><dt>${T('Dia', 'Day')}</dt><dd>${slotLabel(co.slot)}</dd></div><div class="tot"><dt>Total</dt><dd>${money(q.total)}</dd></div>
+      ${q.balanceUsed ? `<div class="disc"><dt>${T('Pago com o Saldo Daqui', 'Paid with your Daqui balance')}</dt><dd>-${money(q.balanceUsed)}</dd></div><div class="tot"><dt>${T('A pagar', 'To pay')}</dt><dd>${money(q.toPay)}</dd></div>` : ''}</dl>
+    <p class="small muted">${T('As caixas de cartão Daqui (5 kg 0,85 €; 10 kg 1,00 €) são descontadas na encomenda seguinte quando as devolve.', 'Daqui cardboard boxes (5 kg €0.85; 10 kg €1.00) are refunded on your next order when you return them.')}</p>`;
 }
 PAGES.finalizar = () => {
   const u = currentUser(), num = QS.get('encomenda');
@@ -519,7 +531,8 @@ PAGES.finalizar = () => {
   <div class="wrap subflow">
     <form class="subform" id="coform" novalidate>
       <fieldset><legend><span class="n">1</span>${T('Como quer receber', 'How you want it')}</legend>
-        <div class="radios"><label><input type="radio" name="co-deliver" value="pickup"${co.deliver === 'pickup' ? ' checked' : ''}>${T('Levantamento grátis', 'Free pick-up')}</label><label><input type="radio" name="co-deliver" value="home"${co.deliver === 'home' ? ' checked' : ''}>${T('Entrega em casa', 'Home delivery')} (+${money(DELIVERY_FEE)})</label></div></fieldset>
+        <div class="radios"><label><input type="radio" name="co-deliver" value="pickup"${co.deliver === 'pickup' ? ' checked' : ''}>${T('Ponto de recolha', 'Pick-up point')} (+${feeText('pickup')})</label><label><input type="radio" name="co-deliver" value="home"${co.deliver === 'home' ? ' checked' : ''}>${T('Entrega em casa', 'Home delivery')} (+${feeText('home')})</label></div>
+        <p class="small muted mt-s">${T(`Portes grátis em compras a partir de ${money(SETTINGS.freeFrom)} e para membros da Cooperativa.`, `Free delivery on orders over ${money(SETTINGS.freeFrom)} and for Co-op members.`)}</p></fieldset>
       <fieldset><legend><span class="n">2</span>${T('Dia de entrega', 'Delivery day')}</legend>
         <div class="slots">${slots.map(x => `<label class="slot"><input type="radio" name="co-slot" value="${x.date}"${x.date === sl.date ? ' checked' : ''}><span><b>${slotLabel(x)}</b><br><span class="small muted">${T('Encomende até', 'Order by')} ${fdate(x.cutoff, { weekday: 'long' })} ${T('às 18h', 'at 6 pm')}</span></span></label>`).join('')}</div>
         ${co.deliver === 'home' ? `<p class="lbl mt">${T('Janela horária', 'Time window')}</p><div class="radios">${DISTRIBUTION.windows.map(w => `<label><input type="radio" name="co-window" value="${w}"${co.window === w ? ' checked' : ''}>${w}</label>`).join('')}</div>`
@@ -538,9 +551,9 @@ PAGES.finalizar = () => {
              <p class="small muted">${T('Tem conta?', 'Have an account?')} <a class="link" href="${href('entrar', 'next=finalizar')}">${T('Entre para guardar a encomenda no seu histórico', 'Sign in to keep this order in your history')}</a>.</p>`}</fieldset>
       ${cart.some(i => P(i.id) && P(i.id).cat === 'caixas') ? `<div class="mt-s">${prefsSummary(u)}</div>` : ''}
       <fieldset><legend><span class="n">${co.deliver === 'home' ? 5 : 4}</span>${T('Pagamento', 'Payment')}</legend>
-        <div class="radios">${[['mbway', 'MB WAY'], ['mb', T('Referência Multibanco', 'Multibanco reference')], ['cartao', T('Cartão', 'Card')], ['entrega', T('Na entrega', 'On delivery')]].map(([v, n]) => `<label><input type="radio" name="co-pay" value="${v}"${co.pay === v ? ' checked' : ''}>${n}</label>`).join('')}</div>
+        ${coPayBlock(u)}
         <div class="field mt"><label for="co-notes">${T('Notas para a entrega (opcional)', 'Delivery notes (optional)')}</label><textarea id="co-notes" data-co="notes" rows="2">${esc(co.notes)}</textarea></div></fieldset>
-      <p class="err" hidden></p>
+      ${(probs => `<p class="err"${probs.length ? '' : ' hidden'}>${stockErrHTML(probs)}</p>`)(cartStockProblems())}
     </form>
     <aside class="subsum panel" aria-live="polite"><div id="cosum">${coSummary()}</div>
       <button class="btn btn-green btn-block mt" data-co-confirm>${T('Confirmar encomenda', 'Place order')}</button>
@@ -548,6 +561,20 @@ PAGES.finalizar = () => {
   </div><div class="spacer"></div>`;
   return { title: T('Finalizar encomenda', 'Check out'), html };
 };
+/* promoção, Saldo Daqui e método de pagamento (o resto, se o saldo não chegar) */
+function coPayBlock(u) {
+  const q = coQuote(), bal = u ? balanceOf(u) : 0, promos = u ? usablePromos(u) : [];
+  const promoBox = !u ? `<p class="small muted">${T('Entre na sua conta para usar promoções e o Saldo Daqui.', 'Sign in to use promotions and your Daqui balance.')}</p>`
+    : `<div class="field"><label for="co-promo">${T('Promoção', 'Promotion')}</label><select id="co-promo" data-co-promo><option value="">${T('Sem promoção', 'No promotion')}</option>${promos.map(p => `<option value="${p.id}"${co.promo === p.id ? ' selected' : ''}${cartTotals().sub < (p.min || 0) ? ' disabled' : ''}>${esc(L(p.title))} (${promoLabel(p)}${p.min ? `, ${T('mín.', 'min.')} ${money(p.min)}` : ''}; ${T('até', 'until')} ${fdate(parseISO(p.until))})</option>`).join('')}</select></div>
+       <div class="code-row"><label class="sr" for="co-code">${T('Código promocional', 'Promo code')}</label><input id="co-code" data-co-code placeholder="${T('Código promocional', 'Promo code')}" value="${esc(co.code)}" autocomplete="off"><button type="button" class="btn btn-line c-campo" data-co-apply>${T('Aplicar', 'Apply')}</button></div>
+       ${co.codeErr ? `<p class="err small">${esc(co.codeErr)}</p>` : ''}`;
+  const balBox = u && bal > 0 ? `<label class="switch mt-s"><input type="checkbox" data-co-check="useBalance"${co.useBalance ? ' checked' : ''}>${T(`Descontar do Saldo Daqui (disponível: ${money(bal)})`, `Use my Daqui balance (available: ${money(bal)})`)}</label>` : '';
+  const rest = !co.useBalance || q.toPay > 0;
+  return `${promoBox}${balBox}
+    ${rest ? `<p class="lbl mt">${co.useBalance && q.balanceUsed ? T(`Pagar o resto (${money(q.toPay)}) com`, `Pay the rest (${money(q.toPay)}) with`) : T('Pagar com', 'Pay with')}</p>
+      <div class="radios">${[['mbway', 'MB WAY'], ['mb', T('Referência Multibanco', 'Multibanco reference')], ['cartao', T('Cartão', 'Card')], ['entrega', T('Na entrega', 'On delivery')]].map(([v, n]) => `<label><input type="radio" name="co-pay" value="${v}"${co.pay === v ? ' checked' : ''}>${n}</label>`).join('')}</div>`
+      : `<p class="note small mt-s">${icon('check', 18)}<span>${T('O Saldo Daqui paga a encomenda toda.', 'Your Daqui balance covers the whole order.')}</span></p>`}`;
+}
 function coRerender(sel) { const y = scrollY; render(); scrollTo(0, y); if (sel) $(sel)?.focus(); }
 PAGE_EVENTS.change.push((e, t) => {
   if (PAGE !== 'finalizar') return;
@@ -556,13 +583,21 @@ PAGE_EVENTS.change.push((e, t) => {
   if (t.name === 'co-window') co.window = t.value;
   if (t.name === 'co-pay') co.pay = t.value;
   if (t.dataset.co === 'point') co.point = t.value;
-  if (t.dataset.coCheck) co[t.dataset.coCheck] = t.checked;
+  if (t.dataset.coCheck) { co[t.dataset.coCheck] = t.checked; if (t.dataset.coCheck === 'useBalance') coRerender('[data-co-check="useBalance"]'); }
+  if ('coPromo' in t.dataset) { co.promo = t.value; coRerender('#co-promo'); }
 });
 PAGE_EVENTS.input.push((e, t) => { if (PAGE === 'finalizar' && t.dataset.co && t.dataset.co !== 'point') co[t.dataset.co] = t.value; });
 PAGE_EVENTS.click.push((e, t, d) => {
   if (PAGE !== 'finalizar') return;
   if ('coNewaddr' in d) { co.useSaved = false; coRerender('#co-street'); return true; }
   if ('coUsesaved' in d) { co.useSaved = true; coRerender('[data-co-newaddr]'); return true; }
+  if ('coApply' in d) {
+    const code = ($('#co-code')?.value || '').trim(); co.code = code; co.codeErr = '';
+    if (!code) return true;
+    claimPromo(null, code).then(pid => { co.promo = pid; co.code = ''; toast(T('Código aplicado', 'Code applied')); coRerender('#co-promo'); }, e => { co.codeErr = e.message; coRerender('#co-code'); });
+    return true;
+  }
+  if (d.coFix) { const [key, left] = d.coFix.split('::'); const i = cart.find(x => x.key === key); if (i) { if (+left > 0) i.qty = +left; else cart.splice(cart.indexOf(i), 1); saveCart(); refreshCartUI(); } coRerender(); return true; }
   if ('coConfirm' in d) {
     const f = $('#coform'), err = $('.err', f), u = currentUser();
     if (!validate(f)) return true;
@@ -570,18 +605,49 @@ PAGE_EVENTS.click.push((e, t, d) => {
     if (co.deliver === 'home' && $('#co-postal') && !/^\d{4}-\d{3}$/.test(co.postal.trim())) bad.push(['#co-postal', T('O código postal deve ter o formato 3810-000.', 'The postcode must look like 3810-000.')]);
     if (!u && !/^[29]\d{8}$/.test(normPhone(co.phone))) bad.push(['#co-phone', T('Indique um telemóvel português com 9 dígitos.', 'Enter a 9-digit Portuguese mobile number.')]);
     if (bad.length) { err.hidden = false; err.textContent = bad.map(b => b[1]).join(' '); $(bad[0][0]).setAttribute('aria-invalid', 'true'); $(bad[0][0]).focus(); return true; }
-    const sl = slotOptions().find(x => x.date === co.slot) || slotOptions()[0], tt = cartTotals();
+    const probs = cartStockProblems();
+    if (probs.length) { coStockError(probs); return true; }
+    const sl = slotOptions().find(x => x.date === co.slot) || slotOptions()[0], q = coQuote();
     const addr = co.deliver !== 'home' ? '' : (u && u.address && co.useSaved) ? `${u.address.street}, ${u.address.postal} ${u.address.town}` : `${co.street.trim()}, ${co.postal.trim()} ${co.town.trim()}`;
     if (u && co.deliver === 'home' && !(u.address && co.useSaved) && co.saveAddr) { u.address = { street: co.street.trim(), postal: co.postal.trim(), town: co.town.trim() }; saveUsers(); }
     const o = { num: newOrderNumber(), user: u ? u.username : null, name: u ? u.name : co.name.trim(), phone: u ? u.phone : normPhone(co.phone), email: co.email.trim(), created: nowISO(), slot: sl.date, day: sl.day, deliver: co.deliver,
       window: co.deliver === 'home' ? co.window : '', point: co.deliver === 'pickup' ? co.point : '', address: addr, items: cart.map(i => Object.assign({ id: i.id, qty: i.qty, price: i.price, size: i.opts.size || '' }, i.opts.bio ? { bio: true } : {})),
-      subtotal: +tt.sub.toFixed(2), fee: tt.del, total: +tt.tot.toFixed(2), pay: co.pay, notes: co.notes.trim(), status: 'ativa' };
+      subtotal: q.sub, fee: q.ship.fee, total: q.total, pay: q.toPay > 0 ? co.pay : 'saldo', notes: co.notes.trim(), status: 'ativa' };
+    if (q.boxes.fee) o.boxesFee = q.boxes.fee; if (q.discount || q.promo) { o.discount = q.discount; o.promo = q.promo.id; } if (q.balanceUsed) o.balance = q.balanceUsed;
     if (u && o.items.some(i => P(i.id) && P(i.id).cat === 'caixas')) o.prefs = { exclude: (u.exclude || []).slice(), favs: (u.favs || []).slice() };   // a gestão vê as preferências do cliente
-    ORDERS.push(o); saveOrders(); cart = []; saveCart(); store.set('daqui-last-order', o.num);
-    go('finalizar', 'encomenda=' + o.num); return true;
+    const btn = $('[data-co-confirm]'); if (btn) btn.disabled = true;
+    placeOrder(o).then(() => { cart = []; saveCart(); store.set('daqui-last-order', o.num); co.promo = ''; co.useBalance = false; go('finalizar', 'encomenda=' + o.num); },
+      e => { if (btn) btn.disabled = false; if (e.stock) { const p = P(e.stock.product); coStockError([{ p, want: inCart(p.id), left: e.stock.left }]); }
+        else { err.hidden = false; err.textContent = /saldo/.test(e.message) ? T('O Saldo Daqui não chega para esta encomenda.', 'Your Daqui balance is not enough for this order.') : T('Não foi possível registar a encomenda: ', 'Could not place the order: ') + e.message; } });
+    return true;
   }
 });
 
+/* stock insuficiente: diz quanto resta e deixa ajustar o cabaz */
+function coStockError(probs) {
+  const err = $('#coform .err'); if (!err) return;
+  err.hidden = false; err.innerHTML = stockErrHTML(probs);
+  err.scrollIntoView({ block: 'center' });
+}
+const stockErrHTML = probs => probs.map(x => `${esc(L(x.p.name))}: ${x.left > 0 ? T(`só restam ${stockText(x.p, x.left)}`, `only ${stockText(x.p, x.left)} left`) : T('esgotou', 'sold out')}. <button type="button" class="link" data-co-fix="${esc((cart.find(i => i.id === x.p.id) || {}).key || '')}::${x.left}">${x.left > 0 ? T('Ajustar o cabaz', 'Adjust basket') : T('Tirar do cabaz', 'Remove from basket')}</button>`).join('<br>');
+/* gravar a encomenda: com base de dados, o Supabase confirma stock, saldo e promoção de uma só vez (trigger daqui_encomenda_stock) */
+async function placeOrder(o) {
+  const u = currentUser();
+  if (NUVEM.on) {
+    try { await NUVEM.placeOrder(o); }
+    catch (e) { const st = NUVEM.stockError(e); if (st) { NUVEM.reloadGroups(['lots'], 0); throw Object.assign(new Error('stock'), { stock: st }); } throw e; }
+    ORDERS.push(o);
+    if (o.balance && u) WALLET.push({ id: 'tmp' + o.num, user: u._id, kind: 'compra', desc: 'Encomenda ' + o.num, value: o.total, balance: -o.balance, method: 'saldo', ref: o.num, at: nowISO() });
+    if (o.promo && u) { const c = claimOf(u, o.promo); if (c) c.used = nowISO(); }
+    o.items.forEach(i => { const p = P(i.id); if (tracksStock(p)) { let left = i.qty; lotsOf(p.id).sort((a, b) => a.harvest.localeCompare(b.harvest)).forEach(l => { const t = Math.min(left, lotLeft(l)); l.sold = round2((l.sold || 0) + t); left -= t; }); } });
+    return;
+  }
+  o.lots = takeStockLocal(o.items);
+  if (o.balance && u) { if (balanceOf(u) < o.balance) { giveBackLocal(o.lots); throw new Error('saldo'); } addMovLocal(u, { kind: 'compra', desc: 'Encomenda ' + o.num, value: o.total, balance: -o.balance, method: 'saldo', ref: o.num }); }
+  if (o.promo && u) { const c = claimOf(u, o.promo); if (c) { c.used = nowISO(); c.order = o.num; store.set(CLAIMS_KEY, CLAIMS); } }
+  ORDERS.push(o); saveOrders();
+  if (u) pushNotifLocal(u.username, T(`Encomenda ${o.num} recebida`, `Order ${o.num} received`), T(`Entrega: ${fdate(parseISO(o.slot), { weekday: 'long' })}.`, `Delivery: ${fdate(parseISO(o.slot), { weekday: 'long' })}.`), 'conta?sec=encomendas');
+}
 /* depois de adicionar ao cabaz na página de produto: seguir para o checkout ou continuar a comprar */
 function addedModal(p, qty, bio) {
   const t = cartTotals(), n = itemCount(cart);

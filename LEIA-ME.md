@@ -80,6 +80,7 @@ No menu da esquerda, **SQL Editor** → *New query*. Para cada ficheiro da pasta
 | `supabase/06-melhorias.sql` | Versão 7: vários produtores por produto e escolha convencional/biológico, aprovar ou rejeitar pedidos com mensagem, edição e avaliações do Colhe Connosco, registo da colheita e "Falar com a Daqui". Corra-o **antes** de enviar a versão 7 do site. Pode ser corrido mais do que uma vez. |
 | `supabase/07-colhe-e-produtos.sql` | Versão 9: vários dias Colhe Connosco na mesma data (cada dia tem um id), avaliação só uma vez, registo da colheita com valor pago, "Deixar de vender" e fotografias de produtos novos. Corra-o **antes** de enviar a versão 9 do site, depois do 06. Depois do 07, não volte a correr o 06. |
 | `supabase/08-avaliacoes-e-caixas.sql` | Versão 10: respostas da gestão aos comentários do Colhe Connosco, lista pública das avaliações dos dias passados e tabela `caixas` (caixas novas criadas na gestão). Corra-o **antes** de enviar a versão 10 do site, depois do 07. |
+| `supabase/09-loja-e-inventario.sql` | Versão 11: inventário (entregas dos agricultores em lotes, stock confirmado em cada encomenda), Saldo Daqui, Cooperativa, promoções e códigos, notificações do sininho, avaliações de produtos, caixas preparadas e definições da gestão (portes). Corra-o **antes** de enviar a versão 11 do site, depois do 08. |
 | `supabase/05-notificacoes.sql` | Só para as notificações da app Android, **depois** de criar a função `notificar` (ver `LEIA-ME-APP.md` do projeto `daqui-android`). Antes de correr, troque as 2 linhas marcadas com `<<<`. |
 
 Para confirmar: **Table Editor** → tabela `perfis` deve ter 27 linhas e `produtos` 94.
@@ -234,7 +235,7 @@ js/                         ver tabela abaixo
 ferramentas/                scripts para gerar páginas, ícones, análises e o SQL da base de dados
 app/index.html              a app para telemóvel (secção 23); app/manifest.webmanifest, app/sw.js, app/icones/
 css/app.css                 estilos só da app (tudo começa por body.app)
-supabase/                   01-estrutura.sql … 08-avaliacoes-e-caixas.sql (secção 2)
+supabase/                   01-estrutura.sql … 09-loja-e-inventario.sql (secção 2)
 supabase/funcoes/notificar/index.ts   função do Supabase que envia as notificações (Firebase)
 LEIA-ME.md                  este ficheiro
 ```
@@ -629,3 +630,27 @@ Base de dados: corra `supabase/08-avaliacoes-e-caixas.sql` (depois do 07; pode r
 | Ícones | Todos os `.svg` da pasta `img/produtos` aparecem para escolher (produto novo, proposta do agricultor e "Mudar a imagem" no catálogo, ao carregar no ícone). No site publicado, a lista vem do GitHub; na app, o `npm run atualizar` cria-a; também pode correr `node ferramentas/listar-icones.js`. |
 | Regiões | Novas regiões: Minho, Porto e Douro, Região de Coimbra, Região de Leiria, Lisboa e Setúbal e Açores (com o seu quadro no mapa de Portugal). |
 | Mapa de Aveiro | Os restaurantes e o ponto de recolha aparecem sobre um mapa real (OpenStreetMap, estilo CARTO). Sem internet, aparece o desenho antigo. |
+
+
+## 28. Versão 11: o que mudou
+
+Base de dados: corra `supabase/09-loja-e-inventario.sql` (depois do 08; pode repetir). Volte a publicar a função `notificar` (som próprio das notificações).
+App Android: `npm install` (plugins novos: Filesystem e Share, para as faturas em PDF), `npm run configurar` (copia o som das notificações) e `npm run atualizar`.
+
+| Ponto | O que mudou |
+| --- | --- |
+| Pedidos ao Supabase | Tudo é lido numa só ronda ao abrir o site e fica guardado no separador (`sessionStorage`). Ao mudar de página não há pedidos nem "A carregar…". Volta a ler só depois de gravar, quando o tempo real avisa, com F5 ou ao fim de 30 min. O chat usa o tempo real em vez de perguntar a cada 6 s. Os ficheiros do site levam `?v=<versão>`, por isso cada atualização aparece logo. |
+| Guardar alterações | Na gestão (catálogo, caixas, parceiros) as alterações nos campos ficam por guardar; uma barra no fundo mostra quantas são e envia-as todas de uma vez (os preços de vários produtos vão num só pedido). |
+| Gestão | Registo de colheita só no próprio dia do Colhe Connosco; história, região e "Agricultor desde" de cada quinta; "Selo desde" e tipo de cozinha de cada restaurante; peso, preço e número de tamanhos de cada caixa e os produtos que leva (ou "escolhidos entre os favoritos"), também nas 4 caixas da Daqui; catálogo alinhado; pedidos dos últimos 7 dias com filtro de datas; separadores novos: Preparar caixas, Inventário, Parceiros, Promoções e Definições (portes, quota, bloquear alterações às entregas). |
+| Inventário | O agricultor regista "Entregas à Daqui": produto, quantidade, data de colheita, refrigeração, análise de laboratório e transporte (leva ele ou a Daqui recolhe numa data). O stock é a soma do que falta vender; encomendas e caixas tiram dos lotes mais antigos. Na loja aparece "Colheita mais recente" e, na página do produto, a data de cada agricultor. Duas pessoas a comprar o último quilo: a base de dados só deixa passar a primeira e a segunda vê quanto resta. |
+| Preparar caixas | No dia antes da distribuição a gestão vê as caixas das subscrições com uma sugestão (favoritos, nunca o que o cliente não quer, stock, colheitas mais antigas, produtos a sair de época) e aceita ou muda. |
+| Agricultores | Filtro por região na app; o pino passa para a frente ao passar o rato (ou a vinheta) e mostra um cartão ao fim de um momento; mapas acompanham a página; setas de "Outros agricultores" na app; o agricultor muda região, posição do pino (tocando no mapa), ano e foto de capa (desenhos ou fotografia). |
+| Restaurantes | Página própria de cada restaurante (menu Daqui com vegetariano/vegan), filtro por cozinha e por vegetariano/vegan, distância a partir da localização do navegador, mapa com arrastar e zoom, 3 estilos de mapa (Conta → Aspeto no site; Definições → Aspeto na app). Lista de cozinhas em `CUISINES` (js/data.js). |
+| Preços | Caixas de cartão (5 kg 0,85 €; 10 kg 1,00 €, sempre a combinação mais barata), portes em casa e no ponto de recolha, grátis acima do valor da gestão (25 €) e para membros. |
+| Saldo, Cooperativa e promoções | Carregar saldo (demonstração), pagar com saldo e o resto com outro método, quota anual da Cooperativa (página `/cooperativa`), sininho com notificações e promoções para reclamar, códigos promocionais, janela de promoção ao abrir a app. |
+| Conta | E-mail, telemóvel, NIF e dados de faturação; faturas e recibos em PDF; na app, língua e permissões em Definições. |
+| Produtos | Avaliações (estrelas e comentário) de quem recebeu o produto ou a caixa, com resposta da Daqui; sugestões da pesquisa alinhadas à esquerda. |
+| Aspeto | Transições suaves entre páginas no site; na app, deslizar entre ecrãs (desliga-se em Definições), animação da pera ao abrir, som ao confirmar um levantamento e som próprio das notificações. |
+| Textos | Termos, Privacidade, Cookies e Devoluções em páginas próprias; mais perguntas frequentes. |
+
+Ficheiros novos: `js/dados.js`, `js/pages-gestao2.js`, `js/pages-extra.js`, `js/faturas.js`, `js/textos.js`, páginas `restaurante/`, `cooperativa/`, `termos/`, `privacidade/`, `cookies/`, `devolucoes/`.

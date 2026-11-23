@@ -23,7 +23,8 @@ const CATALOG_BASE = JSON.parse(JSON.stringify({ products: PRODUCTS, farmers: FA
 function mergeChanges(a, b) {
   const out = JSON.parse(JSON.stringify(a || {}));
   for (const [k, v] of Object.entries(b || {})) {
-    if (['products', 'boxes', 'farmers', 'restaurants'].includes(k)) { out[k] = out[k] || {}; for (const [id, o] of Object.entries(v)) out[k][id] = Object.assign({}, out[k][id] || {}, o); }
+    if (k === 'boxSizes') out[k] = Object.assign({}, out[k] || {}, JSON.parse(JSON.stringify(v)));
+    else if (['products', 'boxes', 'farmers', 'restaurants', 'boxCfg'].includes(k)) { out[k] = out[k] || {}; for (const [id, o] of Object.entries(v)) out[k][id] = Object.assign({}, out[k][id] || {}, o); }
     else if (['newProducts', 'newFarmers', 'newRestaurants', 'newBoxes'].includes(k)) { const list = (out[k] || []).filter(x => !v.some(y => y.id === x.id)); out[k] = list.concat(v); }
     else out[k] = JSON.parse(JSON.stringify(v));
   }
@@ -46,6 +47,8 @@ function applyChanges(ch) {
   (ch.removedProducts || []).forEach(id => { const i = PRODUCTS.findIndex(p => p.id === id); if (i >= 0) PRODUCTS.splice(i, 1); });
   (ch.newProducts || []).forEach(np => { const ex = PRODUCTS.find(p => p.id === np.id); if (ex) Object.assign(ex, np); else PRODUCTS.push(Object.assign({ isNew: true }, np)); });
   for (const [id, o] of Object.entries(ch.products || {})) { const p = PRODUCTS.find(x => x.id === id); if (p) Object.assign(p, o); }
+  for (const [id, c] of Object.entries(ch.boxCfg || {})) { const b = PRODUCTS.find(x => x.id === id); if (b) Object.assign(b, c, { boxCfg: true }); }
+  for (const [id, list] of Object.entries(ch.boxSizes || {})) { BOX_SIZES[id] = list.map(z => ({ s: z.s, kg: +z.kg, price: +z.price })); const b = PRODUCTS.find(x => x.id === id); if (b && list.length) { b.price = Math.min(...list.map(z => +z.price)); if (b.custom) b.kg = +list[0].kg; } }
   for (const [id, sizes] of Object.entries(ch.boxes || {})) { (BOX_SIZES[id] || []).forEach(s => { if (sizes[s.s] != null) s.price = +sizes[s.s]; }); const b = PRODUCTS.find(x => x.id === id); if (b && BOX_SIZES[id]) b.price = Math.min(...BOX_SIZES[id].map(s => s.price)); }
   if (Array.isArray(ch.harvestDays)) { HARVEST_DAYS.length = 0; ch.harvestDays.forEach(d => HARVEST_DAYS.push(Object.assign({ id: d.id || `${d.date}-${d.farmer}` }, d))); HARVEST_DAYS.sort((a, b) => a.date.localeCompare(b.date)); }
   (ch.newFarmers || []).forEach(f => { const ex = FARMERS.find(x => x.id === f.id); if (ex) Object.assign(ex, f); else FARMERS.push(Object.assign({ isNew: true }, f)); });
@@ -55,6 +58,35 @@ function applyChanges(ch) {
 }
 applyChanges(mergeChanges(typeof SAVED_CHANGES !== 'undefined' ? SAVED_CHANGES : {}, LOCAL_CHANGES));
 /* altera o catálogo neste navegador: fn recebe o objeto de alterações local */
+/* ---------- "Guardar alterações": nas páginas de gestão, as alterações feitas nos campos ficam por guardar
+   e vão todas juntas num só envio quando se carrega no botão (barra no fundo do ecrã) ---------- */
+let PENDING = null;
+function editCatalog(fn) { const ch = {}; fn(ch); applyChanges(ch); PENDING = mergeChanges(PENDING || {}, ch); pendingBar(); }
+function pendingCount() { if (!PENDING) return 0; let n = 0; for (const [k, v] of Object.entries(PENDING)) n += Array.isArray(v) ? (k === 'harvestDays' ? 1 : v.length) : Object.keys(v || {}).length; return n; }
+const hasPendingEdits = () => pendingCount() > 0;
+function commitEdits() {
+  const ch = PENDING; PENDING = null; pendingBar();
+  if (!ch) return;
+  if (typeof NUVEM !== 'undefined' && NUVEM.on) NUVEM.pushCatalog(ch);
+  else { LOCAL_CHANGES = mergeChanges(LOCAL_CHANGES, ch); try { localStorage.setItem(CATALOG_KEY, JSON.stringify(LOCAL_CHANGES)); } catch (e) {} }
+  if (typeof toast === 'function') toast(T('Alterações guardadas', 'Changes saved'));
+}
+function discardEdits() { PENDING = null; pendingBar(); location.reload(); }
+function pendingBar() {
+  if (typeof document === 'undefined') return;
+  let b = document.getElementById('pending-bar'); const n = pendingCount();
+  if (!n) { if (b) b.remove(); return; }
+  const label = `<b>${n}</b> ${n === 1 ? T('alteração por guardar', 'unsaved change') : T('alterações por guardar', 'unsaved changes')}`;
+  /* se a barra já existe só muda o texto: os botões não são substituídos (um clique em "Guardar" logo a seguir a escrever num campo não se perde) */
+  if (b) { b.querySelector('span').innerHTML = label; return; }
+  b = document.createElement('div'); b.id = 'pending-bar'; b.className = 'pending-bar'; b.setAttribute('role', 'region'); b.setAttribute('aria-label', T('Alterações por guardar', 'Unsaved changes'));
+  b.innerHTML = `<span>${label}</span><button type="button" class="btn btn-line btn-sm" data-pending-discard>${T('Descartar', 'Discard')}</button><button type="button" class="btn btn-green btn-sm" data-pending-save>${T('Guardar alterações', 'Save changes')}</button>`;
+  document.body.appendChild(b);
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', e => { if (hasPendingEdits()) { e.preventDefault(); e.returnValue = ''; } });
+  document.addEventListener('click', e => { const t = e.target.closest('[data-pending-save],[data-pending-discard]'); if (!t) return; if (t.matches('[data-pending-save]')) commitEdits(); else discardEdits(); });
+}
 function saveCatalog(fn) {
   if (typeof NUVEM !== 'undefined' && NUVEM.on) { const ch = {}; fn(ch); applyChanges(ch); NUVEM.pushCatalog(ch); return; }   // com base de dados: grava lá
   fn(LOCAL_CHANGES);

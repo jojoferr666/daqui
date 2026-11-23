@@ -17,9 +17,7 @@ const NUVEM = (() => {
   const KEY = (typeof SUPABASE_KEY === 'string' ? SUPABASE_KEY : '').trim();
   const POLL = Math.max(5, +(typeof SUPABASE_ATUALIZAR_SEGUNDOS !== 'undefined' ? SUPABASE_ATUALIZAR_SEGUNDOS : 30) || 30) * 1000;
   const SESS_KEY = 'daqui-nuvem-sessao', GUEST_KEY = 'daqui-encomendas-visitante';
-  const TABLES = ['caixas', 'produtos', 'agricultores', 'restaurantes', 'dias_colhe', 'caixas_precos', 'perfis', 'subscricoes', 'inscricoes_colhe', 'encomendas', 'pedidos', 'mensagens'];
-  const CATALOG_TABLES = TABLES.slice(0, 6);
-  const N = { on: false, configured: /^https?:\/\//.test(BASE) && KEY.length > 20, live: false, error: '', failed: false };
+    const N = { on: false, configured: /^https?:\/\//.test(BASE) && KEY.length > 20, live: false, error: '', failed: false };
   let sess = null, me = null, ocup = {}, ownAtLoad = {}, snap = {}, chain = Promise.resolve();
 
   /* ---------- pedidos HTTP ---------- */
@@ -32,7 +30,9 @@ const NUVEM = (() => {
     const r = await fetch(BASE + path, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body), keepalive: method !== 'GET' });   // keepalive: termina mesmo que a página mude
     const txt = await r.text(); let data = null;
     try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
+    if (method !== 'GET' && r.ok) { const g = noteWrite(path); if (g.length) reloadGroups(g, 1200); }
     if (!r.ok) {
+      if (method !== 'GET') noteWrite(path);
       const e = new Error((data && (data.message || data.msg || data.error_description || data.error)) || 'HTTP ' + r.status);
       e.status = r.status; e.code = data && (data.code || data.error_code || data.error); throw e;
     }
@@ -48,7 +48,7 @@ const NUVEM = (() => {
     sess = { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: d.expires_at || Math.floor(Date.now() / 1000) + (d.expires_in || 3600), user_id: d.user ? d.user.id : sess && sess.user_id };
     store.set(SESS_KEY, sess); rtToken();
   }
-  function clearSession() { sess = null; me = null; store.del(SESS_KEY); store.del(SESSION_KEY); rtClose(); }
+  function clearSession() { sess = null; me = null; store.del(SESS_KEY); store.del(SESSION_KEY); rtClose(); try { sessionStorage.removeItem('daqui-nuvem-copia'); sessionStorage.removeItem('daqui-nuvem-sujo'); } catch (e) {} }
   let refreshing = null;
   function refresh() {
     if (!sess) return Promise.resolve();
@@ -90,18 +90,21 @@ const NUVEM = (() => {
   const toFarmer = r => Object.assign({}, r.extra || {}, { id: r.id, name: r.nome, farm: r.quinta, place: r.localidade, region: r.regiao, lat: r.lat, lon: r.lon, since: r.desde,
     crop: r.cultura, seed: r.semente, story: { pt: r.historia_pt || '', en: r.historia_en || '' } }, BASE_IDS.f.has(r.id) ? {} : { isNew: true });
   const fromFarmer = (f, ordem) => ({ id: f.id, nome: f.name, quinta: f.farm, localidade: f.place || '', regiao: f.region || 'aveiro', lat: f.lat, lon: f.lon, desde: f.since || null,
-    cultura: f.crop || null, semente: f.seed || 0, historia_pt: (f.story || {}).pt || '', historia_en: (f.story || {}).en || '', extra: f.island ? { island: f.island } : {}, ordem });
-  const FARMER_PATCH = { name: v => ({ nome: v }), farm: v => ({ quinta: v }), place: v => ({ localidade: v }), story: v => ({ historia_pt: v.pt || '', historia_en: v.en || '' }), region: v => ({ regiao: v }), lat: v => ({ lat: v }), lon: v => ({ lon: v }) };
+    cultura: f.crop || null, semente: f.seed || 0, historia_pt: (f.story || {}).pt || '', historia_en: (f.story || {}).en || '', extra: farmExtra(f).extra, ordem });
+  const FARMER_PATCH = { name: v => ({ nome: v }), farm: v => ({ quinta: v }), place: v => ({ localidade: v }), story: v => ({ historia_pt: v.pt || '', historia_en: v.en || '' }), region: v => ({ regiao: v }), lat: v => ({ lat: v }), lon: v => ({ lon: v }),
+    since: v => ({ desde: v ? +v : null }), cover: (v, f) => farmExtra(f), island: (v, f) => farmExtra(f) };
+  const farmExtra = f => ({ extra: Object.assign({}, f && f.island ? { island: f.island } : {}, f && f.cover ? { cover: f.cover } : {}) });
+  const restExtra = r => ({ extra: Object.assign({}, r && r.cuisine ? { cuisine: r.cuisine } : {}, r && r.dishVeg ? { dishVeg: true } : {}, r && r.dishVegan ? { dishVegan: true } : {}) });
   const toRest = r => Object.assign({}, r.extra || {}, { id: r.id, name: r.nome, lat: r.lat, lon: r.lon, kind: { pt: r.tipo_pt, en: r.tipo_en }, area: { pt: r.zona_pt, en: r.zona_en },
     dish: { pt: r.prato_pt, en: r.prato_en }, since: r.desde, dishes: r.pratos || [] }, BASE_IDS.r.has(r.id) ? {} : { isNew: true });
   const bi = (o, k) => (o || {})[k] || '';
   const fromRest = (r, ordem) => ({ id: r.id, nome: r.name, lat: r.lat, lon: r.lon, tipo_pt: bi(r.kind, 'pt'), tipo_en: bi(r.kind, 'en'), zona_pt: bi(r.area, 'pt'), zona_en: bi(r.area, 'en'),
-    prato_pt: bi(r.dish, 'pt'), prato_en: bi(r.dish, 'en'), desde: r.since || null, pratos: r.dishes || [], ordem });
+    prato_pt: bi(r.dish, 'pt'), prato_en: bi(r.dish, 'en'), desde: r.since || null, pratos: r.dishes || [], extra: restExtra(r).extra, ordem });
   const REST_PATCH = { name: v => ({ nome: v }), kind: v => ({ tipo_pt: bi(v, 'pt'), tipo_en: bi(v, 'en') }), area: v => ({ zona_pt: bi(v, 'pt'), zona_en: bi(v, 'en') }),
-    dish: v => ({ prato_pt: bi(v, 'pt'), prato_en: bi(v, 'en') }), dishes: v => ({ pratos: v || [] }), since: v => ({ desde: v }), lat: v => ({ lat: v }), lon: v => ({ lon: v }) };
+    dish: v => ({ prato_pt: bi(v, 'pt'), prato_en: bi(v, 'en') }), dishes: v => ({ pratos: v || [] }), since: v => ({ desde: v }), lat: v => ({ lat: v }), lon: v => ({ lon: v }), cuisine: (v, r) => restExtra(r), dishVeg: (v, r) => restExtra(r), dishVegan: (v, r) => restExtra(r) };
   const toDay = r => ({ id: r.id || `${r.dia}-${r.agricultor}`, date: r.dia, farmer: r.agricultor, crop: r.cultura, what: { pt: r.produto_pt, en: r.produto_en }, time: r.horario, spots: r.lugares });
   const fromDay = d => ({ id: d.id || `${d.date}-${d.farmer}`, dia: d.date, agricultor: d.farmer, cultura: d.crop || null, produto_pt: (d.what || {}).pt || '', produto_en: (d.what || {}).en || '', horario: d.time, lugares: +d.spots });
-  const mapPatch = (o, map) => Object.entries(o).reduce((acc, [k, v]) => (map[k] ? Object.assign(acc, map[k](v)) : acc), {});
+  const mapPatch = (o, map, cur) => Object.entries(o).reduce((acc, [k, v]) => (map[k] ? Object.assign(acc, map[k](v, cur)) : acc), {});
 
   const toSub = r => ({ id: r.id, box: r.caixa, size: r.tamanho, kg: +r.kg, freq: r.frequencia, day: r.dia, deliver: r.entrega, point: r.ponto, address: r.morada, discovery: !!r.descoberta,
     pay: r.pagamento, locked: +r.preco_guardado, start: r.inicio, first: r.primeira, status: r.estado, lowered: !!r.baixou });
@@ -109,24 +112,27 @@ const NUVEM = (() => {
     descoberta: !!s.discovery, pagamento: s.pay || null, preco_guardado: +s.locked, inicio: s.start, primeira: s.first, estado: s.status || 'ativa', baixou: !!s.lowered });
   const toUser = (p, subs, harv) => ({ _id: p.id, name: p.nome, username: p.username, phone: p.telemovel || '', email: p.email || '', role: p.papel, created: p.criado,
     address: p.morada || null, favs: p.favoritos || [], exclude: p.excluidos || [], notify: p.avisos || [], partner: p.parceiro || null,
+    nif: p.nif || '', billing: p.faturacao || null, coopUntil: p.cooperativa_ate || null,
     subs: subs.map(toSub), harvests: harv.map(toHarv) });
   /* inscrição Colhe Connosco: pessoas, avaliação do cliente e registo da colheita feito pela gestão */
   const toHarv = h => { const x = { day: h.dia_id || null, date: h.dia, people: h.pessoas }; if (h.avaliacao) { x.rating = h.avaliacao; x.comment = h.comentario || ''; x.ratedAt = h.avaliado; } if (h.registo) x.record = h.registo; if (h.resposta) x.reply = { text: h.resposta, at: h.respondido }; return x; };
   const harvRow = h => ({ pessoas: +h.people || 1, avaliacao: h.rating ? +h.rating : null, comentario: h.rating ? h.comment || '' : null, registo: h.record || null, resposta: h.reply && h.reply.text ? h.reply.text : null });
   const fromUser = u => ({ telemovel: u.phone || null, nome: u.name, email: u.email || null, morada: u.address || null, favoritos: u.favs || [], excluidos: u.exclude || [], avisos: u.notify || [],
-    parceiro: u.partner || null, papel: u.role });
+    parceiro: u.partner || null, papel: u.role, nif: u.nif || null, faturacao: u.billing || null });
   const uidOf = un => (un && USERS[un] ? USERS[un]._id : null);
   const toOrder = r => {
     const o = { num: r.num, user: r.username || null, name: r.nome, phone: r.telemovel, email: r.email || '', created: r.criada, slot: r.data_entrega, day: r.dia, deliver: r.entrega,
       window: r.janela || '', point: r.ponto || '', address: r.morada || '', items: r.artigos || [], subtotal: +r.subtotal, fee: +r.taxa, total: +r.total, pay: r.pagamento, notes: r.notas || '', status: r.estado };
     if (r.etapa != null) o.stage = r.etapa;
     if (r.preferencias) o.prefs = r.preferencias;
+    if (+r.cartao) o.boxesFee = +r.cartao; if (+r.saldo) o.balance = +r.saldo; if (+r.desconto) o.discount = +r.desconto; if (r.promo) o.promo = r.promo;
     if (r.user_id) o._uid = r.user_id;
     return o;
   };
   const fromOrder = o => ({ num: o.num, user_id: o._uid || uidOf(o.user), username: o.user || null, nome: o.name, telemovel: o.phone, email: o.email || null, criada: o.created,
     data_entrega: o.slot, dia: o.day, entrega: o.deliver, janela: o.window || null, ponto: o.point || null, morada: o.address || null, artigos: o.items, subtotal: +o.subtotal, taxa: +o.fee,
-    total: +o.total, pagamento: o.pay || null, notas: o.notes || null, estado: o.status || 'ativa', etapa: typeof o.stage === 'number' ? o.stage : null, preferencias: o.prefs || null });
+    total: +o.total, pagamento: o.pay || null, notas: o.notes || null, estado: o.status || 'ativa', etapa: typeof o.stage === 'number' ? o.stage : null, preferencias: o.prefs || null,
+    cartao: +o.boxesFee || 0, saldo: +o.balance || 0, desconto: +o.discount || 0, promo: o.promo || null });
   const toReq = r => {
     const x = { id: r.id, type: r.tipo, created: r.criado, status: r.estado, user: r.username || null, fields: r.campos || {} };
     if (r.parceiro) x.partnerUser = r.parceiro; if (r.encomenda) x.order = r.encomenda; if (r.aprovado) x.approved = true; if (r.produto_id) x.productId = r.produto_id; if (r.user_id) x._uid = r.user_id;
@@ -135,41 +141,87 @@ const NUVEM = (() => {
   };
   const fromReq = r => ({ id: r.id, tipo: r.type, criado: r.created, estado: r.status, user_id: r._uid || uidOf(r.user), username: r.user || null, parceiro: r.partnerUser || null,
     encomenda: r.order || null, aprovado: !!r.approved, produto_id: r.productId || null, campos: r.fields || {}, decisao: r.decision || null, resposta: r.reply || null, decidido: r.decidedAt || null });
+  /* ---------- v11: inventário, avaliações, promoções, notificações, Saldo Daqui, caixas preparadas ---------- */
+  const toLot = r => ({ id: r.id, farmer: r.agricultor, product: r.produto, qty: +r.quantidade, sold: +r.vendido || 0, harvest: r.colheita, cold: !!r.frio, lab: !!r.analise,
+    transport: r.transporte || 'proprio', pickup: r.recolha || null, created: r.criado });
+  const fromLot = l => ({ id: l.id, agricultor: l.farmer, produto: l.product, quantidade: +l.qty, colheita: l.harvest, frio: !!l.cold, analise: !!l.lab, transporte: l.transport || 'proprio', recolha: l.transport === 'recolha' ? l.pickup || null : null });
+  const toReview = r => ({ id: r.id, product: r.produto, name: r.nome || '', stars: +r.estrelas, comment: r.comentario || '', at: r.criada, mine: !!r.minha, reply: r.resposta ? { text: r.resposta, at: r.respondida } : null });
+  const toPromo = r => ({ id: r.id, title: { pt: r.titulo_pt, en: r.titulo_en || r.titulo_pt }, text: { pt: r.texto_pt || '', en: r.texto_en || r.texto_pt || '' }, kind: r.tipo, value: +r.valor, min: +r.minimo || 0,
+    until: r.ate, code: r.codigo || '', public: !!r.publica, active: !!r.ativa, created: r.criada });
+  const fromPromo = p => ({ id: p.id, titulo_pt: p.title.pt, titulo_en: p.title.en || p.title.pt, texto_pt: (p.text || {}).pt || '', texto_en: (p.text || {}).en || '', tipo: p.kind, valor: +p.value || 0, minimo: +p.min || 0,
+    ate: p.until, codigo: p.code || null, publica: !!p.public, ativa: p.active !== false });
+  const toNotif = r => ({ id: r.id, title: { pt: r.titulo_pt, en: r.titulo_en }, text: { pt: r.texto_pt, en: r.texto_en }, route: r.rota || '', promo: r.promo || null, read: !!r.lida, at: r.criada });
+  const toMov = r => ({ id: r.id, user: r.user_id, kind: r.tipo, desc: r.descricao, value: +r.valor, balance: +r.saldo, method: r.metodo || '', ref: r.ref || '', at: r.criado });
+  const toClaim = r => ({ promo: r.promo, user: r.user_id, at: r.reclamada, used: r.usada || null, order: r.encomenda || null });
+  const toPrep = r => ({ id: r.id, sub: r.subscricao, user: r.user_id, date: r.data, items: r.artigos || [], at: r.criada });
   const diff = (prev, row) => { const d = {}; for (const k of Object.keys(row)) if (J(row[k]) !== J(prev[k])) d[k] = row[k]; return Object.keys(d).length ? d : null; };
   const fill = (arr, items) => { arr.length = 0; items.forEach(x => arr.push(x)); };
 
-  /* ---------- ler da base de dados ---------- */
-  async function loadCatalog() {
-    const [prods, farms, rests, days, boxes, oc] = await Promise.all([
-      rest('GET', 'produtos', 'select=*&order=ordem.asc,id.asc'), rest('GET', 'agricultores', 'select=*&order=ordem.asc,id.asc'),
+  /* ---------- ler da base de dados ----------
+     Tudo é pedido numa só ronda (os pedidos vão ao mesmo tempo). O que vem fica guardado neste separador
+     (sessionStorage): ao mudar de página o site desenha logo com essa cópia e não pergunta nada ao Supabase.
+     Volta a ler só o que mudou: depois de gravar alguma coisa, quando o tempo real avisa, com F5, ou ao fim de 30 min. */
+  const opt = p => p.catch(() => null);   // tabela ou função que ainda não existe (SQL por correr): ignora
+  const GROUPS = ['cat', 'lots', 'defs', 'reviews', 'promos', 'people', 'msgs', 'mine'];
+  const FETCH = {
+    cat: () => Promise.all([rest('GET', 'produtos', 'select=*&order=ordem.asc,id.asc'), rest('GET', 'agricultores', 'select=*&order=ordem.asc,id.asc'),
       rest('GET', 'restaurantes', 'select=*&order=ordem.asc,id.asc'), rest('GET', 'dias_colhe', 'select=*&order=dia.asc'),
-      rest('GET', 'caixas_precos', 'select=*&order=caixa.asc,ordem.asc'), rest('GET', 'colhe_ocupacao', 'select=*')]);
+      rest('GET', 'caixas_precos', 'select=*&order=caixa.asc,ordem.asc'), rest('GET', 'colhe_ocupacao', 'select=*'), opt(rest('GET', 'caixas', 'select=*&order=ordem.asc,criada.asc'))])
+      .then(([prods, farms, rests, days, boxes, oc, custom]) => ({ prods, farms, rests, days, boxes, oc, custom: custom || [] })),
+    lots: () => opt(rest('GET', 'lotes', 'select=*&order=colheita.asc,criado.asc')),
+    defs: () => opt(rest('GET', 'definicoes', 'select=*')),
+    reviews: () => Promise.all([opt(rest('GET', 'avaliacoes_publicas', 'select=*&order=criada.desc&limit=3000')), opt(rpc('colhe_avaliacoes', {}))]).then(([p, c]) => ({ p, c })),
+    promos: () => opt(rest('GET', 'promocoes', 'select=*&order=criada.desc')),
+    people: () => !sess ? Promise.resolve(null) : Promise.all([rest('GET', 'perfis', 'select=*&order=criado.asc,username.asc'), rest('GET', 'subscricoes', 'select=*&order=criada.asc'),
+      rest('GET', 'inscricoes_colhe', 'select=*'), rest('GET', 'encomendas', 'select=*&order=criada.desc&limit=1000'), rest('GET', 'pedidos', 'select=*&order=criado.desc&limit=1000'),
+      opt(rpc('colhe_resumo_agricultor', {}))]).then(([perfis, subs, harv, ords, reqs, farm]) => ({ perfis, subs, harv, ords, reqs, farm })),
+    msgs: () => { if (sess) return rest('GET', 'mensagens', 'select=*&order=criada.asc&limit=2000'); const c = store.get('daqui-conversa', ''); return c ? opt(rpc('mensagens_convidado', { p_conversa: c })) : Promise.resolve([]); },
+    mine: () => !sess ? Promise.resolve(null) : Promise.all([opt(rest('GET', 'notificacoes', 'select=*&order=criada.desc&limit=100')), opt(rest('GET', 'movimentos', 'select=*&order=criado.desc&limit=2000')),
+      opt(rest('GET', 'promos_utilizador', 'select=*')), opt(rest('GET', 'preparacoes', 'select=*&order=data.desc&limit=2000'))]).then(([n, m, c, p]) => ({ n: n || [], m: m || [], c: c || [], p: p || [] }))
+  };
+  const APPLY = { cat: applyCat, lots: r => { if (typeof LOTS !== 'undefined') fill(LOTS, (r || []).map(toLot)); N.hasLots = Array.isArray(r); },
+    defs: r => { if (typeof SETTINGS !== 'undefined' && Array.isArray(r)) { const g = r.find(x => x.chave === 'geral'); if (g) Object.assign(SETTINGS, g.valor); } },
+    reviews: r => { if (typeof PRODUCT_REVIEWS !== 'undefined') fill(PRODUCT_REVIEWS, ((r && r.p) || []).map(toReview));
+      N.harvestReviews = {}; ((r && r.c) || []).forEach(x => { (N.harvestReviews[x.dia_id] = N.harvestReviews[x.dia_id] || []).push({ name: x.nome || '', rating: +x.avaliacao, comment: x.comentario || '', reply: x.resposta || '', at: x.avaliado || '' }); }); },
+    promos: r => { if (typeof PROMOS !== 'undefined') fill(PROMOS, (r || []).map(toPromo)); },
+    people: applyPeople, msgs: r => { if (typeof MESSAGES !== 'undefined') fill(MESSAGES, (r || []).map(toMsg)); },
+    mine: r => { if (typeof NOTIFS === 'undefined') return; fill(NOTIFS, r ? r.n.map(toNotif) : []); fill(WALLET, r ? r.m.map(toMov) : []); fill(CLAIMS, r ? r.c.map(toClaim) : []); fill(PREPS, r ? r.p.map(toPrep) : []); } };
+  let RAW = {};
+  async function fetchGroups(list) {
+    const res = await Promise.all(list.map(g => FETCH[g]()));
+    list.forEach((g, i) => { RAW[g] = res[i]; });
+    /* os grupos dependem uns dos outros (ex.: as encomendas precisam das contas): aplica sempre por esta ordem */
+    GROUPS.filter(g => list.includes(g)).forEach(g => { if (g in RAW) APPLY[g](RAW[g]); });
+    saveCache();
+  }
+  function applyCat(c) {
+    if (!c) return;
+    const { prods, farms, rests, days, boxes, oc, custom } = c;
     if (!prods.length) { N.error = 'catalogo-vazio'; return; }
-    /* caixas criadas na gestão (tabela "caixas", supabase/08); sem a tabela, ficam só as 4 caixas da Daqui */
-    const custom = await rest('GET', 'caixas', 'select=*&order=ordem.asc,criada.asc').catch(() => []);
+    /* caixas criadas na gestão (tabela "caixas", supabase/08); as 4 caixas da Daqui também podem ter linha aí (supabase/09: produtos e modo) */
     PRODUCTS.filter(p => p.custom).forEach(p => { delete BOX_SIZES[p.id]; });
-    custom.forEach(r => { BOX_SIZES[r.id] = []; });
+    const own = custom.filter(r => !r.base && !STATIC_BOXES.includes(r.id)), base = custom.filter(r => r.base || STATIC_BOXES.includes(r.id));
+    own.forEach(r => { BOX_SIZES[r.id] = []; });
     fill(FARMERS, farms.map(toFarmer));
-    fill(PRODUCTS, PRODUCTS.filter(p => p.cat === 'caixas' && !p.custom).concat(custom.map(r => boxProduct({ id: r.id, name: { pt: r.nome_pt, en: r.nome_en }, desc: { pt: r.desc_pt, en: r.desc_en }, items: r.produtos || [], icon: r.icone || '', sizes: [] })), prods.map(toProd)));
+    fill(PRODUCTS, PRODUCTS.filter(p => p.cat === 'caixas' && !p.custom).concat(own.map(r => boxProduct({ id: r.id, name: { pt: r.nome_pt, en: r.nome_en }, desc: { pt: r.desc_pt, en: r.desc_en }, items: r.produtos || [], mode: r.modo || 'fixo', icon: r.icone || '', sizes: [] })), prods.map(toProd)));
+    base.forEach(r => { const b = PRODUCTS.find(p => p.id === r.id); if (b) { b.items = r.produtos || []; b.mode = r.modo || 'fixo'; b.boxCfg = true; } });
     fill(RESTAURANTS, rests.map(toRest));
     fill(HARVEST_DAYS, days.map(toDay));
     Object.keys(snap).filter(k => k.startsWith('d:')).forEach(k => delete snap[k]);
     HARVEST_DAYS.forEach(d => { snap['d:' + d.id] = J(fromDay(d)); });
-    boxes.forEach(r => { const list = BOX_SIZES[r.caixa]; if (!list) return; const z = list.find(x => x.s === r.tamanho); if (z) { z.price = +r.preco; z.kg = +r.kg; } else list.push({ s: r.tamanho, kg: +r.kg, price: +r.preco }); });
+    /* tamanhos: a base de dados manda (a gestão pode mudar pesos e acrescentar ou tirar tamanhos) */
+    const seen = {};
+    boxes.forEach(r => { const list = BOX_SIZES[r.caixa]; if (!list) return; if (!seen[r.caixa]) { seen[r.caixa] = 1; list.length = 0; } list.push({ s: r.tamanho, kg: +r.kg, price: +r.preco }); });
     PRODUCTS.filter(p => p.cat === 'caixas' && BOX_SIZES[p.id] && BOX_SIZES[p.id].length).forEach(b => { b.price = Math.min(...BOX_SIZES[b.id].map(z => z.price)); if (b.custom) b.kg = BOX_SIZES[b.id][0].kg; });
     ocup = {}; oc.forEach(x => { const k = x.dia_id || (HARVEST_DAYS.find(d => d.date === x.dia) || {}).id; if (k) ocup[k] = (ocup[k] || 0) + (+x.pessoas || 0); });
   }
   function guestOrders() { return store.get(GUEST_KEY, []).filter(x => x && x.num); }
   function rememberGuestOrder(o) { const list = guestOrders().filter(x => x.num !== o.num); list.unshift({ num: o.num, phone: o.phone }); store.set(GUEST_KEY, list.slice(0, 10)); }
-  async function loadPeople() {
+  function applyPeople(r) {
     Object.keys(snap).filter(k => /^[usohr]:/.test(k)).forEach(k => delete snap[k]);
-    let perfis = [], subs = [], harv = [], ords = [], reqs = [];
-    if (sess) {
-      [perfis, subs, harv, ords, reqs] = await Promise.all([rest('GET', 'perfis', 'select=*&order=criado.asc,username.asc'), rest('GET', 'subscricoes', 'select=*&order=criada.asc'),
-        rest('GET', 'inscricoes_colhe', 'select=*'), rest('GET', 'encomendas', 'select=*&order=criada.desc&limit=1000'), rest('GET', 'pedidos', 'select=*&order=criado.desc&limit=1000')]);
-      me = perfis.find(p => p.id === sess.user_id) || null;
-      if (!me) { clearSession(); perfis = subs = harv = ords = reqs = []; }
-    }
+    let { perfis = [], subs = [], harv = [], ords = [], reqs = [], farm = null } = r || {};
+    me = sess ? perfis.find(p => p.id === sess.user_id) || null : null;
+    if (sess && !me) { perfis = subs = harv = ords = reqs = []; farm = null; }
     const users = {};
     perfis.forEach(p => { users[p.username] = toUser(p, subs.filter(s => s.user_id === p.id), harv.filter(h => h.user_id === p.id)); });
     for (const k of Object.keys(USERS)) if (!users[k]) delete USERS[k];
@@ -185,25 +237,36 @@ const NUVEM = (() => {
     fill(ORDERS, orders.concat(keepGuest));
     ORDERS.forEach(o => { snap['o:' + o.num] = J(fromOrder(o)); });
     fill(REQUESTS, reqs.map(toReq));
-    REQUESTS.forEach(r => { snap['r:' + r.id] = J(fromReq(r)); });
-    await loadMsgs();
-    N.farmerHarvest = null;
-    /* avaliações públicas dos dias Colhe Connosco (para a lista de dias passados; sem dados pessoais) */
-    try { const rv = await rpc('colhe_avaliacoes', {}) || []; N.harvestReviews = {}; rv.forEach(x => { (N.harvestReviews[x.dia_id] = N.harvestReviews[x.dia_id] || []).push({ name: x.nome || '', rating: +x.avaliacao, comment: x.comentario || '', reply: x.resposta || '', at: x.avaliado || '' }); }); }
-    catch (e) { N.harvestReviews = {}; }
-    if (me && me.papel === 'agricultor') { try { N.farmerHarvest = Object.fromEntries((await rpc('colhe_resumo_agricultor', {}) || []).map(x => [x.dia_id || (HARVEST_DAYS.find(d => d.date === x.dia) || {}).id, { people: +x.pessoas || 0, n: +x.n || 0, avg: +x.media || 0, kg: +x.kg || 0, comments: x.comentarios || [] }])); } catch (e) { console.warn(e); } }
+    REQUESTS.forEach(q => { snap['r:' + q.id] = J(fromReq(q)); });
+    N.farmerHarvest = me && me.papel === 'agricultor' && Array.isArray(farm) ? Object.fromEntries(farm.map(x => [x.dia_id || (HARVEST_DAYS.find(d => d.date === x.dia) || {}).id, { people: +x.pessoas || 0, n: +x.n || 0, avg: +x.media || 0, kg: +x.kg || 0, comments: x.comentarios || [] }])) : null;
   }
   /* mensagens ("Falar com a Daqui"): a gestão vê todas; cada conta vê as suas; sem conta, as da conversa guardada neste navegador */
   const toMsg = r => ({ id: r.id, conv: r.conversa, user: (Object.values(USERS).find(u => u._id === r.user_id) || {}).username || null, name: r.nome || '', contact: r.contacto || '', from: r.autor, text: r.texto, at: r.criada, read: !!r.lida });
-  async function loadMsgs() {
-    if (typeof MESSAGES === 'undefined') return;
-    let rows = [];
-    if (sess) rows = await rest('GET', 'mensagens', 'select=*&order=criada.asc&limit=2000');
-    else { const c = store.get('daqui-conversa', ''); if (c) rows = await rpc('mensagens_convidado', { p_conversa: c }) || []; }
-    fill(MESSAGES, rows.map(toMsg));
-  }
+  const loadMsgs = () => fetchGroups(['msgs']);
   async function loadGuestOrders() {
     for (const g of guestOrders().slice(0, 5)) { if (ORDERS.some(o => o.num === g.num && !o._tel)) continue; try { await lookupOrder(g.num, g.phone); } catch (e) {} }
+  }
+
+  /* ---------- cópia no separador ---------- */
+  const CACHE_KEY = 'daqui-nuvem-copia', DIRTY_KEY = 'daqui-nuvem-sujo', CACHE_MAX = 30 * 60 * 1000;
+  const ss = { get: k => { try { return JSON.parse(sessionStorage.getItem(k)); } catch (e) { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, J(v)); } catch (e) {} }, del: k => { try { sessionStorage.removeItem(k); } catch (e) {} } };
+  let cacheT = 0;
+  function saveCache() { if (!N.on) return; ss.set(CACHE_KEY, { uid: sess ? sess.user_id : null, t: cacheT || (cacheT = Date.now()), raw: RAW }); }
+  const dirty = () => new Set(ss.get(DIRTY_KEY) || []);
+  function markDirty(groups) { if (!groups.length) return; const d = dirty(); groups.forEach(g => d.add(g)); ss.set(DIRTY_KEY, [...d]); }
+  function clearDirty(groups) { const d = dirty(); groups.forEach(g => d.delete(g)); ss.set(DIRTY_KEY, [...d]); }
+  N.clearCache = () => { ss.del(CACHE_KEY); ss.del(DIRTY_KEY); };
+  /* o que cada gravação muda: assim só esses grupos voltam a ser lidos */
+  const TABLE_GROUPS = { produtos: ['cat'], agricultores: ['cat'], restaurantes: ['cat'], dias_colhe: ['cat', 'people'], caixas_precos: ['cat'], caixas: ['cat'], lotes: ['lots'], definicoes: ['defs'],
+    avaliacoes_produtos: ['reviews'], promocoes: ['promos', 'mine'], perfis: ['people'], subscricoes: ['people'], inscricoes_colhe: ['people', 'reviews', 'cat'], encomendas: ['people', 'lots', 'mine'],
+    pedidos: ['people'], mensagens: ['msgs'], notificacoes: ['mine'], movimentos: ['mine'], promos_utilizador: ['mine'], preparacoes: ['mine', 'lots'] };
+  const RPC_GROUPS = { definir_stock: ['cat'], deixar_produto: ['cat'], juntar_produtos: ['cat', 'people', 'lots', 'reviews'], editar_dia_colhe: ['cat', 'people'], carregar_saldo: ['mine'], pagar_quota: ['mine', 'people'],
+    reclamar_promo: ['mine', 'promos'], marcar_lidas: ['msgs'], enviar_mensagem_convidado: ['msgs'], confirmar_levantamento: ['people'], gerir_encomenda: ['people', 'lots'] };
+  const wrote = {};   // tabela -> quando foi gravada por este separador (para ignorar o eco do tempo real)
+  function noteWrite(path) {
+    let m = path.match(/^\/rest\/v1\/rpc\/([a-z_]+)/), groups = [];
+    if (m) groups = RPC_GROUPS[m[1]] || []; else if ((m = path.match(/^\/rest\/v1\/([a-z_]+)/))) { groups = TABLE_GROUPS[m[1]] || []; wrote[m[1]] = Date.now(); }
+    markDirty(groups); return groups;
   }
   async function lookupOrder(num, phone) {
     const row = await rpc('encomenda_por_numero', { p_num: normOrder(num), p_tel: normPhone(phone) });
@@ -284,9 +347,18 @@ const NUVEM = (() => {
   N.pushCatalog = ch => queue(async () => {
     const up = 'resolution=merge-duplicates,return=minimal';
     for (const f of ch.newFarmers || []) await rest('POST', 'agricultores', 'on_conflict=id', fromFarmer(f, FARMERS.length), up);
-    for (const [id, o] of Object.entries(ch.farmers || {})) { const p = mapPatch(o, FARMER_PATCH); if (Object.keys(p).length) await rest('PATCH', 'agricultores', 'id=' + eq(id), p, 'return=minimal'); }
+    for (const [id, o] of Object.entries(ch.farmers || {})) { const p = mapPatch(o, FARMER_PATCH, F(id)); if (Object.keys(p).length) await rest('PATCH', 'agricultores', 'id=' + eq(id), p, 'return=minimal'); }
     for (const p of ch.newProducts || []) await rest('POST', 'produtos', 'on_conflict=id', fromProd(p, PRODUCTS.length), up);
-    for (const [id, o] of Object.entries(ch.products || {})) { const p = mapPatch(o, PROD_PATCH); if (Object.keys(p).length) await rest('PATCH', 'produtos', 'id=' + eq(id), p, 'return=minimal'); }
+    /* vários produtos alterados (gestão, "Guardar alterações"): um só pedido com todas as linhas */
+    const prodIds = Object.keys(ch.products || {}).filter(id => Object.keys(mapPatch(ch.products[id], PROD_PATCH)).length);
+    if (prodIds.length > 1 && isAdmin()) await rest('POST', 'produtos', 'on_conflict=id', prodIds.map(id => P(id)).filter(Boolean).map(p => { const r = fromProd(p, 0); delete r.ordem; return r; }), up);
+    else for (const id of prodIds) await rest('PATCH', 'produtos', 'id=' + eq(id), mapPatch(ch.products[id], PROD_PATCH), 'return=minimal');
+    for (const [id, c] of Object.entries(ch.boxCfg || {})) { const b = P(id); if (!b) continue;
+      await rest('POST', 'caixas', 'on_conflict=id', { id, nome_pt: b.name.pt, nome_en: b.name.en || b.name.pt, desc_pt: (b.desc || {}).pt || '', desc_en: (b.desc || {}).en || '', produtos: b.items || [], modo: b.mode || 'fixo', icone: b.icon || null, base: STATIC_BOXES.includes(id), ordem: 0 }, up); }
+    for (const [id, list] of Object.entries(ch.boxSizes || {})) {
+      await rest('DELETE', 'caixas_precos', 'caixa=' + eq(id), undefined, 'return=minimal');
+      if (list.length) await rest('POST', 'caixas_precos', '', list.map((z, i) => ({ caixa: id, tamanho: z.s, kg: +z.kg, preco: +z.price, ordem: i })), 'return=minimal');
+    }
     for (const b of ch.newBoxes || []) {
       await rest('POST', 'caixas', 'on_conflict=id', { id: b.id, nome_pt: b.name.pt, nome_en: b.name.en || b.name.pt, desc_pt: (b.desc || {}).pt || '', desc_en: (b.desc || {}).en || '', produtos: b.items || [], icone: b.icon || null, ordem: PRODUCTS.filter(p => p.custom).length }, up);
       await rest('POST', 'caixas_precos', 'on_conflict=caixa,tamanho', b.sizes.map((s, i) => ({ caixa: b.id, tamanho: s.s, kg: +s.kg, preco: +s.price, ordem: i })), up);
@@ -298,7 +370,7 @@ const NUVEM = (() => {
       for (const k of Object.keys(snap)) if (k.startsWith('d:') && !ch.harvestDays.some(d => 'd:' + fromDay(d).id === k)) { await rest('DELETE', 'dias_colhe', 'id=' + eq(k.slice(2)), undefined, 'return=minimal'); delete snap[k]; }
     }
     for (const r of ch.newRestaurants || []) await rest('POST', 'restaurantes', 'on_conflict=id', fromRest(r, RESTAURANTS.length), up);
-    for (const [id, o] of Object.entries(ch.restaurants || {})) { const p = mapPatch(o, REST_PATCH); if (Object.keys(p).length) await rest('PATCH', 'restaurantes', 'id=' + eq(id), p, 'return=minimal'); }
+    for (const [id, o] of Object.entries(ch.restaurants || {})) { const p = mapPatch(o, REST_PATCH, RESTAURANTS.find(x => x.id === id)); if (Object.keys(p).length) await rest('PATCH', 'restaurantes', 'id=' + eq(id), p, 'return=minimal'); }
   });
   /* fotografias das incidências: pasta pública "incidencias" do Storage (supabase/04-app.sql) */
   /* fotografias de telemóvel podem ter vários MB: reduz para no máximo 1600 px em JPEG antes de enviar (limite do balde: 5 MB) */
@@ -336,6 +408,7 @@ const NUVEM = (() => {
   N.unregisterDevice = token => (sess ? rpc('remover_dispositivo', { p_token: token }).catch(() => {}) : Promise.resolve());
   N.hasSession = () => !!sess;
   N.loadMessages = () => queue(loadMsgs, true);
+  N.reloadGroups = reloadGroups;
   N.sendMessage = (m, owner) => queue(async () => {
     if (sess) {
       const row = { conversa: m.conv, user_id: m.from === 'gestao' ? (owner && owner._id) || null : sess.user_id, nome: m.name || null, contacto: m.contact || null, autor: m.from, texto: m.text };
@@ -356,6 +429,27 @@ const NUVEM = (() => {
   N.mergeProducts = (keep, drop) => queue(() => rpc('juntar_produtos', { p_manter: keep, p_juntar: drop })).then(() => reloadSoon(true, true));
   N.deleteProduct = id => queue(() => rest('DELETE', 'produtos', 'id=' + eq(id), undefined, 'return=minimal'));
 
+  /* ---------- v11 ---------- */
+  const stockError = e => { const m = String(e && e.message || '').match(/stock:([^:]+):([\d.]+)/); return m ? { product: m[1], left: +m[2] } : null; };
+  N.stockError = stockError;
+  /* encomenda nova: espera pela resposta (stock, saldo e promoção são confirmados pelo Supabase) */
+  N.placeOrder = o => { let err = null; return queue(async () => { try { const row = fromOrder(o); if (!sess) row.user_id = null; await rest('POST', 'encomendas', '', row, 'return=minimal'); snap['o:' + o.num] = J(row); if (!sess) { o._tel = o.phone; rememberGuestOrder(o); } } catch (e) { err = e; } }).then(() => { if (err) throw err; }); };
+  N.saveLot = l => queue(async () => { const row = fromLot(l); if (l._new) { const r = await rest('POST', 'lotes', '', row, 'return=representation'); delete l._new; if (Array.isArray(r) && r[0]) Object.assign(l, toLot(r[0])); } else await rest('PATCH', 'lotes', 'id=' + eq(l.id), row, 'return=minimal'); });
+  N.deleteLot = id => queue(() => rest('DELETE', 'lotes', 'id=' + eq(id), undefined, 'return=minimal'));
+  N.saveSettings = v => queue(() => rest('POST', 'definicoes', 'on_conflict=chave', { chave: 'geral', valor: v }, 'resolution=merge-duplicates,return=minimal'));
+  N.addReview = (product, stars, comment) => queue(async () => { const r = await rest('POST', 'avaliacoes_produtos', '', { produto: product, user_id: sess.user_id, estrelas: stars, comentario: comment }, 'return=representation'); return r; });
+  N.replyReview = (id, text) => queue(() => rest('PATCH', 'avaliacoes_produtos', 'id=' + eq(id), { resposta: text }, 'return=minimal'));
+  N.topUp = (v, m) => rpc('carregar_saldo', { p_valor: v, p_metodo: m }).then(x => { reloadGroups(['mine'], 0); return x; });
+  N.payCoop = m => rpc('pagar_quota', { p_metodo: m }).then(x => { reloadGroups(['mine', 'people'], 0); return x; });
+  N.claimPromo = (id, code) => rpc('reclamar_promo', { p_promo: id || null, p_codigo: code || null }).then(x => { reloadGroups(['mine', 'promos'], 0); return x; });
+  N.savePromo = p => queue(() => rest('POST', 'promocoes', 'on_conflict=id', fromPromo(p), 'resolution=merge-duplicates,return=minimal'));
+  N.readNotifs = ids => (ids.length ? queue(() => rest('PATCH', 'notificacoes', 'id=in.(' + ids.join(',') + ')', { lida: true }, 'return=minimal'), true) : Promise.resolve());
+  N.deleteNotif = id => queue(() => rest('DELETE', 'notificacoes', 'id=' + eq(id), undefined, 'return=minimal'), true);
+  N.savePrep = p => queue(() => rest('POST', 'preparacoes', 'on_conflict=id', { id: p.id, subscricao: p.sub, user_id: p.user || null, data: p.date, artigos: p.items }, 'resolution=merge-duplicates,return=minimal'));
+  N.deletePrep = id => queue(() => rest('DELETE', 'preparacoes', 'id=' + eq(id), undefined, 'return=minimal'));
+  N.changeEmail = async email => { await http('PUT', '/auth/v1/user', { email }); };
+  N.balance = () => (typeof WALLET === 'undefined' || !sess ? 0 : WALLET.filter(m => m.user === sess.user_id).reduce((a, m) => a + m.balance, 0));
+
   /* ---------- contas ---------- */
   N.signIn = async (login, pass) => {
     const l = String(login || '').trim(), tel = normPhone(l);
@@ -363,7 +457,7 @@ const NUVEM = (() => {
     if (!email) return null;
     try { setSession(await authPost('token?grant_type=password', { email, password: pass })); }
     catch (e) { if (e.status === 400 || e.status === 401) return null; throw e; }
-    await loadPeople(); rtConnect();
+    N.clearCache(); await fetchGroups(['people', 'mine', 'msgs', 'reviews']); rtConnect();
     return currentUser();
   };
   /* palavra-passe: confirma a atual (entrando outra vez com ela) e só depois grava a nova no Supabase Auth */
@@ -399,7 +493,7 @@ const NUVEM = (() => {
       throw err;
     }
     if (!d || !d.access_token) return { errors: { email: 'confirm' } };
-    setSession(d); await loadPeople();
+    setSession(d); N.clearCache(); await fetchGroups(['people', 'mine', 'msgs']);
     const u = currentUser(); if (u) partnerRequest(u);
     rtConnect();
     return u ? { user: u } : { errors: { auth: 1 } };
@@ -422,7 +516,7 @@ const NUVEM = (() => {
     ws.onopen = () => {
       const ref = String(++wsRef);
       ws.send(J({ topic: 'realtime:daqui', event: 'phx_join', ref, join_ref: ref, payload: { config: { broadcast: { ack: false, self: false }, presence: { key: '', enabled: false },
-        postgres_changes: TABLES.map(t => ({ event: '*', schema: 'public', table: t })), private: false }, access_token: sess && sess.access_token } }));
+        postgres_changes: Object.keys(TABLE_GROUPS).map(t => ({ event: '*', schema: 'public', table: t })), private: false }, access_token: sess && sess.access_token } }));
       clearInterval(hb); hb = setInterval(() => { if (ws && ws.readyState === 1) ws.send(J({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++wsRef) })); }, 25000);
     };
     ws.onmessage = ev => {
@@ -431,7 +525,7 @@ const NUVEM = (() => {
       if (m.event === 'phx_reply' && m.payload && m.payload.status === 'error') setLive(false);
       if (m.event === 'system' && m.payload) setLive(m.payload.status === 'ok');
       if (m.event === 'phx_reply' && m.payload && m.payload.status === 'ok' && m.payload.response && m.payload.response.postgres_changes) setLive(true);
-      if (m.event === 'postgres_changes') { const t = m.payload && m.payload.data && m.payload.data.table; reloadSoon(CATALOG_TABLES.includes(t), !CATALOG_TABLES.includes(t)); }
+      if (m.event === 'postgres_changes') { const t = m.payload && m.payload.data && m.payload.data.table; if (wrote[t] && Date.now() - wrote[t] < 5000) return; markDirty(TABLE_GROUPS[t] || []); reloadGroups(TABLE_GROUPS[t] || GROUPS); }
       if (m.event === 'phx_error' || m.event === 'phx_close') setLive(false);
     };
     ws.onclose = () => { setLive(false); clearInterval(hb); if (!closing) { clearTimeout(retry); retry = setTimeout(rtConnect, 15000); } };
@@ -442,39 +536,58 @@ const NUVEM = (() => {
   function setLive(v) { if (N.live === v) return; N.live = v; $$('[data-nuvem-estado]').forEach(el => { el.outerHTML = N.badge(); }); }
 
   /* ---------- voltar a ler e redesenhar sem estragar o que a pessoa está a fazer ---------- */
-  let wantCat = false, wantPeople = false, timer = null;
-  function reloadSoon(cat, people) {
-    wantCat = wantCat || cat; wantPeople = wantPeople || people;
+  let want = new Set(), timer = null;
+  function reloadGroups(groups, wait = 500) {
+    groups.forEach(g => want.add(g));
     clearTimeout(timer);
     timer = setTimeout(() => {
-      const c = wantCat, p = wantPeople; wantCat = wantPeople = false;
+      const list = GROUPS.filter(g => want.has(g)); want = new Set();
+      if (!list.length) return;
       const before = signature();
-      queue(async () => { if (c) await loadCatalog(); if (p) await loadPeople(); if (signature() !== before) softRender(); }, true);
-    }, 500);
+      const msgsBefore = list.includes('msgs') && typeof MESSAGES !== 'undefined' ? J(MESSAGES.map(m => [m.id, m.read])) : null;
+      queue(async () => {
+        await fetchGroups(list); clearDirty(list);
+        /* mensagem nova (tempo real): o chat aberto atualiza-se sem esperar */
+        if (msgsBefore !== null && msgsBefore !== J(MESSAGES.map(m => [m.id, m.read])) && typeof chatAfterNew === 'function') { chatAfterNew(); return; }
+        if (signature() !== before) softRender();
+        if (typeof refreshBell === 'function') refreshBell();
+      }, true);
+    }, wait);
   }
-  const signature = () => J([PRODUCTS, FARMERS, RESTAURANTS, HARVEST_DAYS, BOX_SIZES, USERS, ORDERS, REQUESTS, ocup, typeof MESSAGES === 'undefined' ? 0 : MESSAGES, N.harvestReviews || 0, N.farmerHarvest || 0]);
+  const reloadSoon = (cat, people) => reloadGroups(cat && people ? GROUPS : [].concat(cat ? ['cat', 'lots'] : [], people ? ['people', 'msgs', 'mine'] : []));
+  const signature = () => J([PRODUCTS, FARMERS, RESTAURANTS, HARVEST_DAYS, BOX_SIZES, USERS, ORDERS, REQUESTS, ocup, typeof MESSAGES === 'undefined' ? 0 : MESSAGES, N.harvestReviews || 0, N.farmerHarvest || 0,
+    typeof LOTS === 'undefined' ? 0 : [LOTS, SETTINGS, PRODUCT_REVIEWS, PROMOS, NOTIFS, WALLET, CLAIMS, PREPS]]);
   function softRender() {
-    const busy = $('#modal.on') || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.closest('main'));
+    const busy = $('#modal.on') || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.closest('main')) || (typeof hasPendingEdits === 'function' && hasPendingEdits());
     if (busy) { setTimeout(softRender, 2500); return; }
     if (typeof rerenderKeep === 'function') rerenderKeep(); else { const y = scrollY; render(); scrollTo(0, y); }
   }
 
   /* ---------- arranque ---------- */
+  const isReload = () => { try { const e = performance.getEntriesByType('navigation')[0]; return !!e && e.type === 'reload'; } catch (x) { return false; } };
   N.start = async () => {
     if (!N.configured) return;
     sess = store.get(SESS_KEY, null);
     try {
       if (sess) await fresh();
-      await loadCatalog();
-      N.on = true;
-      try { await loadPeople(); }
-      catch (e) { if (e.status === 401 || e.status === 403) { clearSession(); await loadPeople(); } else throw e; }
-      await loadGuestOrders();
-      if (!sess) { try { await loadMsgs(); } catch (e) {} }
+      const c = ss.get(CACHE_KEY), uid = sess ? sess.user_id : null;
+      const useCache = c && c.raw && c.raw.cat && c.uid === uid && !isReload() && Date.now() - c.t < CACHE_MAX;
+      if (useCache) {
+        /* mudança de página: desenha logo com a cópia; só lê o que ficou por atualizar depois de uma gravação */
+        RAW = c.raw; cacheT = c.t; N.on = true;
+        GROUPS.forEach(g => { if (g in RAW) APPLY[g](RAW[g]); });
+        const d = GROUPS.filter(g => dirty().has(g) || !(g in RAW));
+        if (d.length) reloadGroups(d, 0);
+      } else {
+        ss.del(CACHE_KEY); cacheT = Date.now(); RAW = {};
+        try { await fetchGroups(GROUPS); }
+        catch (e) { if (sess && (e.status === 401 || e.status === 403)) { clearSession(); RAW = {}; await fetchGroups(GROUPS); } else throw e; }
+        N.on = true; saveCache(); clearDirty(GROUPS);
+      }
+      loadGuestOrders();
       if (sess) rtConnect();
-      // na app não há mudança de página depois de entrar, por isso a verificação corre sempre (só lê com sessão iniciada)
-      setInterval(() => { if (sess && document.visibilityState === 'visible' && !N.live) reloadSoon(true, true); }, POLL);
-      setInterval(() => { if (sess && document.visibilityState === 'visible' && N.live) reloadSoon(true, true); }, 60000);   // segurança, mesmo com tempo real
+      /* sem tempo real (ex.: rede que bloqueia WebSockets) volta a ler de vez em quando; com tempo real, nunca */
+      setInterval(() => { if (sess && document.visibilityState === 'visible' && !N.live) reloadGroups(['people', 'msgs', 'mine', 'lots']); }, POLL);
     } catch (e) {
       console.warn('[Daqui/Supabase] sem ligação, a usar os dados do navegador:', e);
       N.on = false; N.failed = true; N.error = String(e && e.message || e);

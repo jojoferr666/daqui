@@ -52,7 +52,7 @@ export async function enviar(m: Mensagem, acesso: string): Promise<number> {
         token: m.token,
         notification: { title: m.titulo, body: m.texto },
         data: { rota: m.rota ?? '' },
-        android: { priority: 'HIGH', notification: { color: '#3C6104', icon: 'ic_stat_daqui', channel_id: 'daqui' } },
+        android: { priority: 'HIGH', notification: { color: '#3C6104', icon: 'ic_stat_daqui', channel_id: 'daqui_som', sound: 'daqui_notificacao' } },
       },
     }),
   });

@@ -984,3 +984,221 @@ svg.picon.crate{width:100%;height:100%}
 .img-prev.sm{width:56px;height:56px}
 /* mapa de Aveiro com mosaicos reais */
 .avmap .av-tiles image{image-rendering:auto}
+
+/* =====================================================================================
+   v11 — inventário, preços, Saldo Daqui, Cooperativa, sininho, restaurantes, faturas, aspeto
+   ===================================================================================== */
+/* mapas que acompanham a página (agricultores, página de um agricultor, restaurantes): a coluna estica
+   até ao fim da lista e o mapa "cola" no topo enquanto se desliza */
+.farm-layout .map-col,.rest-layout .map-col{align-self:stretch}
+.farm-layout .map-sticky,.rest-layout .map-sticky{position:sticky;top:16px}
+.rest-layout .map-col .mapbox{position:sticky;top:16px}
+.farmer-prods{align-items:start}
+@media (max-width:960px){ .farm-layout .map-sticky,.rest-layout .map-sticky,.rest-layout .map-col .mapbox{position:static} }
+
+/* barra "Guardar alterações" */
+.pending-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:12px;background:var(--folha);color:#fff;border-radius:999px;padding:10px 12px 10px 22px;box-shadow:0 14px 40px rgba(20,35,5,.35);animation:pbIn .25s ease-out;max-width:calc(100vw - 24px)}
+.pending-bar .btn-line{color:#fff;border-color:rgba(255,255,255,.55)}
+.pending-bar b{color:var(--pera)}
+@keyframes pbIn{from{opacity:0;transform:translate(-50%,20px)}}
+
+/* filtros de datas (Pedidos e avisos) */
+.range-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:10px 0 16px}
+.range-row input[type=date]{font:inherit;font-size:.95rem;border:1.5px solid var(--line);border-radius:10px;padding:.35em .6em;background:#fff;color:var(--folha)}
+.range-row .lbl{margin:0}
+
+/* stock e colheitas */
+.stock-line{display:flex;align-items:center;gap:6px;color:var(--campo);font-weight:700;margin:6px 0}
+.stock-line.low{color:var(--tomato)}
+.fm-harv{display:inline-flex;align-items:center;gap:5px;color:var(--campo);font-weight:700}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:.8rem;font-weight:700;background:var(--sage);color:var(--folha);border-radius:999px;padding:.15em .7em;text-decoration:none;white-space:nowrap}
+.tag.warn{background:#FBE3DC;color:var(--tomato)}
+.tag.ok{background:#DDEFC9;color:var(--campo)}
+a.tag:hover{background:var(--sage-d)}
+
+/* preços no checkout */
+.dl .disc dd,.dl .disc dt{color:var(--campo)}
+.code-row{display:flex;gap:8px;align-items:stretch;margin-top:8px}
+.code-row input{flex:1;min-width:0;font:inherit;border:1.5px solid var(--line);border-radius:12px;padding:.55em .8em;text-transform:uppercase;background:#fff}
+.code-row input::placeholder{text-transform:none}
+
+/* entregas do agricultor */
+.lots{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.lot{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:start;border:1px solid var(--line);border-radius:var(--r-md);padding:12px;background:#fff}
+.lot .thumb{width:52px;height:52px}
+.lot-b{display:grid;gap:4px;min-width:0}
+.lot-tags{display:flex;flex-wrap:wrap;gap:6px}
+.lot form.row{align-items:end}
+@media (max-width:640px){ .lot{grid-template-columns:44px 1fr} .lot .prod-acts{grid-column:1 / -1} }
+
+/* perfil da quinta: mapa para tocar e foto de capa */
+.fp-two{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:8px}
+@media (max-width:760px){ .fp-two{grid-template-columns:1fr} }
+.pin-pick{border-radius:var(--r-lg);overflow:hidden;border:2px dashed var(--line);cursor:crosshair;max-width:340px}
+.pin-pick svg{display:block;width:100%;height:auto}
+.pin-pick .pin{pointer-events:none}
+.cover-now{width:100%;max-width:340px;aspect-ratio:16/10;border-radius:var(--r-md);overflow:hidden;background:var(--sage)}
+.cover-now svg,.cover-now img,.cover-img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-opts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px;max-width:340px}
+.cover-opt{cursor:pointer;border-radius:10px;overflow:hidden;border:2px solid transparent;aspect-ratio:16/10;display:block}
+.cover-opt input{position:absolute;opacity:0;pointer-events:none}
+.cover-opt span,.cover-opt svg{display:block;width:100%;height:100%}
+.cover-opt:has(input:checked){border-color:var(--campo);box-shadow:0 0 0 2px var(--pera)}
+.cover-opt:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:2px}
+.fcard .pic img.cover-img,.fh-pic img.cover-img,.fm-pic img.cover-img{border-radius:inherit}
+
+/* gestão: caixas, preparar, inventário */
+.box-ed h4{font-family:var(--body);font-size:1rem;margin:10px 0 6px}
+.sizes-tbl td{vertical-align:middle}
+.sizes-tbl .num{width:90px}
+.thumb.sm{width:30px;height:30px;flex:none}
+.prep-list{display:grid;gap:12px;margin-top:12px}
+.prep{border-left:5px solid var(--pera)}
+.prep.done{border-left-color:var(--campo);background:#F7FAEF}
+.prep-items{list-style:none;margin:10px 0;padding:0;display:grid;gap:8px}
+.prep-items li{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.prep-items select{font:inherit;font-size:.95rem;border:1.5px solid var(--line);border-radius:10px;padding:.3em .5em;max-width:220px;background:#fff}
+.prep-items .num{width:76px}
+
+/* catálogo da gestão: tudo alinhado e com o mesmo tamanho */
+.cat-tbl{table-layout:fixed;width:100%}
+.cat-tbl th:nth-child(1){width:30%}.cat-tbl th:nth-child(2){width:16%}.cat-tbl th:nth-child(3){width:19%}.cat-tbl th:nth-child(4){width:17%}.cat-tbl th:nth-child(5){width:13%}.cat-tbl th:nth-child(6){width:5%}
+.cat-tbl td{vertical-align:middle;padding-top:10px;padding-bottom:10px}
+.cat-tbl td:first-child .row-gap{flex-wrap:nowrap;align-items:center;gap:12px}
+.cat-tbl .thumb,.cat-tbl .thumb-btn{width:48px;height:48px;min-width:48px;flex:none}
+.cat-tbl td:first-child .row-gap>span:last-child{min-width:0;overflow-wrap:anywhere;line-height:1.3}
+.cat-tbl td .num{width:84px}
+.cat-tbl td .num.pct{width:54px;margin-right:4px}
+.cat-tbl .sel.sm{width:74px}
+.cat-tbl tbody tr:nth-child(even){background:#FBFCF5}
+
+/* restaurantes */
+.vtag{display:inline-flex;align-items:center;gap:4px;font-size:.8rem;font-weight:700;color:#2E6B12;background:#E3F1D3;border-radius:999px;padding:.15em .65em;vertical-align:middle}
+.vtag.vegan{color:#0F5E46;background:#D3EEE3}
+.vtag.sm{font-size:.72rem;padding:.1em .5em}
+.rest-hero{display:grid;grid-template-columns:1.1fr 1fr;gap:30px;align-items:center;padding-top:20px;padding-bottom:10px}
+[hidden]{display:none!important}
+.rest-hero h1{margin:6px 0}
+.seal-mini svg{width:64px;height:64px}
+.mapbox.sm{max-height:360px}
+@media (max-width:860px){ .rest-hero{grid-template-columns:1fr} }
+.menu-list{list-style:none;margin:0;padding:0;display:grid;gap:10px;max-width:760px}
+.menu-list li{display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px dashed var(--line);padding:10px 0}
+.menu-list li.week b{color:var(--campo)}
+.rest h3 a{text-decoration:none;color:inherit}
+.rest h3 a:hover{text-decoration:underline}
+
+/* mapa de Aveiro: arrastar e ampliar */
+.pz-box{position:relative}
+.pz-box svg.avmap{touch-action:pan-y;cursor:grab}
+.pz-box.zoomed svg.avmap{cursor:grab}
+.pz-box svg.avmap:active{cursor:grabbing}
+.pz-ctr{position:absolute;right:10px;top:10px;display:grid;gap:6px;z-index:2}
+.pz-ctr button{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--folha);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 12px rgba(20,35,5,.12)}
+.pz-ctr button:hover{background:var(--sage)}
+
+/* estilos do mapa (pré-visualização em Aspeto) */
+.look-maps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px;max-width:620px}
+.look-map{display:grid;gap:4px;cursor:pointer;border:2px solid var(--line);border-radius:var(--r-md);padding:10px;background:#fff}
+.look-map input{position:absolute;opacity:0;pointer-events:none}
+.look-map:has(input:checked){border-color:var(--campo);box-shadow:0 0 0 2px var(--pera-l)}
+.look-map:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:2px}
+.lm-prev svg{display:block;width:100%;height:auto;border-radius:8px}
+.lm-prev[data-mapa="1"] .av-tiles{filter:saturate(.35) brightness(1.08) contrast(.85)}
+.lm-prev[data-mapa="2"] .av-tiles{filter:grayscale(1) brightness(1.18) contrast(.6)}
+@media (max-width:520px){ .look-maps{grid-template-columns:1fr 1fr 1fr;gap:6px} .look-map{padding:6px} .look-map .small{display:none} }
+
+/* cartão do agricultor ao passar pelo pino */
+.pin-tip{position:absolute;z-index:80;display:flex;gap:12px;align-items:center;width:290px;background:#fff;border-radius:var(--r-md);padding:10px;box-shadow:0 16px 40px rgba(20,35,5,.22);border:1px solid var(--line);opacity:0;transform:translateY(6px);transition:opacity .18s,transform .18s;pointer-events:none}
+.pin-tip.on{opacity:1;transform:none}
+.pin-tip .pt-pic{width:76px;height:76px;flex:none;border-radius:10px;overflow:hidden;background:var(--sage)}
+.pin-tip .pt-pic svg,.pin-tip .pt-pic img{width:100%;height:100%;object-fit:cover}
+.pin-tip div{display:grid;gap:1px;min-width:0;line-height:1.3}
+svg.ptmap .pin g{transition:transform .15s}
+svg.ptmap .pin:hover g,svg.ptmap .pin.hl g{transform-box:fill-box}
+
+/* sininho */
+.icon-btn.bell{position:relative;color:inherit}
+.icon-btn.bell .count,.a-hero-btn .count{position:absolute;top:-2px;right:-4px;min-width:18px;height:18px;border-radius:999px;background:var(--pera);color:var(--folha);font-size:.72rem;font-weight:700;display:grid;place-items:center;padding:0 4px}
+.bell-panel{position:absolute;z-index:95;width:min(400px,calc(100vw - 16px));max-height:70vh;overflow:auto;background:var(--paper);color:var(--folha);border-radius:var(--r-lg);box-shadow:0 22px 60px rgba(20,35,5,.3);padding:16px 16px 12px;border:1px solid var(--line)}
+.bell-panel h2{font-size:1.3rem;margin:0}
+.bell-promos{display:grid;gap:10px;margin:10px 0}
+.promo-card{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:linear-gradient(120deg,var(--pera-l),#FFF6DE);border:1px solid var(--pera);border-radius:var(--r-md);padding:12px}
+.promo-card.claimed{background:#fff;border-color:var(--line)}
+.promo-card div{display:grid;gap:2px;min-width:0;line-height:1.35}
+.pc-ic{width:40px;height:40px;border-radius:12px;background:var(--campo);color:var(--pera);display:grid;place-items:center}
+.promo-card.big .pc-ic{width:56px;height:56px}
+.notif-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.notif-list li{display:flex;align-items:flex-start;gap:8px;padding:10px;border-radius:12px}
+.notif-list li.unread{background:var(--sage)}
+.notif-list li>a,.notif-list li>div{flex:1;display:grid;gap:2px;text-decoration:none;color:inherit;min-width:0;line-height:1.35}
+.notif-list li>a:hover b{text-decoration:underline}
+
+/* Saldo Daqui e Cooperativa */
+.wallet{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.wallet-card,.coop-card{display:grid;gap:6px;align-content:start;border-radius:var(--r-lg);padding:18px}
+.wallet-card{background:var(--campo);color:#fff}
+.wallet-card strong{font-family:var(--display);font-size:2.2rem;color:var(--pera);line-height:1.1}
+.wallet-card .btn{justify-self:start}
+.coop-card{background:var(--sage);border:1px solid var(--line)}
+.coop-card.on{background:#E3F1D3}
+.coop-card strong{font-family:var(--display);font-size:1.6rem}
+.coop-card .btn{justify-self:start}
+@media (max-width:640px){ .wallet{grid-template-columns:1fr} }
+.mov-list,.inv-list{list-style:none;margin:8px 0 0;padding:0;display:grid}
+.mov-list li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);line-height:1.35}
+.inv-list li{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);line-height:1.35}
+.inv-ic{width:38px;height:38px;border-radius:12px;background:var(--sage);display:grid;place-items:center;color:var(--campo)}
+@media (max-width:640px){ .inv-list li{grid-template-columns:auto 1fr auto} .inv-list li>.row-gap{grid-column:2 / -1} }
+.coop-perks .checks{margin:0}
+.c-ok{color:var(--campo)}
+
+/* faturas */
+.invoice{font-size:.95rem}
+.inv-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:3px solid var(--campo);padding-bottom:12px}
+.inv-head img{background:var(--campo);border-radius:10px;padding:8px}
+.inv-head h2{margin:0;font-size:1.4rem}
+.inv-buyer{display:grid;gap:2px;background:var(--sage);border-radius:var(--r-md);padding:12px;margin:14px 0}
+.inv-tbl{width:100%}
+.inv-tbl th,.inv-tbl td{font-size:.9rem}
+.inv-sum{display:flex;justify-content:flex-end;margin-top:10px}
+.inv-sum .dl{min-width:260px}
+.ta-r{text-align:right}
+
+/* avaliações de produtos */
+.star-pick{display:flex;flex-direction:row-reverse;justify-content:flex-end;gap:2px;font-size:1.9rem;line-height:1}
+.star-pick label{cursor:pointer;color:#D4D7C4}
+.star-pick label:hover,.star-pick label:hover~label,.star-pick label:has(input:checked),.star-pick label:has(input:checked)~label{color:var(--pera-d)}
+.star-pick label:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+.reviews .reply{background:var(--sage);border-radius:12px;padding:8px 12px;margin-top:6px}
+.reviews .reply p{margin:2px 0 0}
+.oc-rev{grid-column:1 / -1;margin:6px 0 0}
+
+/* políticas */
+.legal-toc{background:var(--sage);border-radius:var(--r-md);padding:12px 18px;max-width:760px}
+.legal-toc ol{margin:0;padding-left:1.2em;columns:2;column-gap:28px}
+.legal-toc a{text-decoration:none}
+.legal h2{scroll-margin-top:80px}
+.legal-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.legal-cards a{text-decoration:none;color:inherit;display:grid;gap:8px}
+.legal-cards a:hover{border-color:var(--campo)}
+@media (max-width:640px){ .legal-toc ol{columns:1} }
+
+/* pesquisa: o que se escreve e as sugestões ficam encostados à esquerda */
+.search,.search input,.suggest,.suggest h4,.search .sug-list a,.search .chips{text-align:left}
+.search .chips{justify-content:flex-start}
+.search .sug-list a{justify-content:flex-start}
+.search .sug-list .picon{margin:0;flex:none}   /* a margem automática empurrava o texto para a direita */
+
+/* transições entre páginas: a página nova entra suavemente; ao sair, desvanece */
+@view-transition{navigation:auto}
+::view-transition-old(root){animation:vtOut .22s ease-in both}
+::view-transition-new(root){animation:vtIn .32s cubic-bezier(.2,.8,.2,1) both}
+@keyframes vtOut{to{opacity:0;transform:translateY(-6px)}}
+@keyframes vtIn{from{opacity:0;transform:translateY(10px)}}
+body.pronto #main{animation:pageIn .38s cubic-bezier(.2,.8,.2,1) both}
+body.saindo #main{opacity:0;transform:translateY(-6px);transition:opacity .16s ease-in,transform .16s ease-in}
+@keyframes pageIn{from{opacity:0;transform:translateY(10px)}}
+body.no-anim #main,body.no-anim .pending-bar{animation:none!important;transition:none!important}
+html.no-anim::view-transition-old(root),html.no-anim::view-transition-new(root){animation:none}
+@media (prefers-reduced-motion:reduce){ body.pronto #main,body.saindo #main{animation:none;transition:none} ::view-transition-old(root),::view-transition-new(root){animation:none} }

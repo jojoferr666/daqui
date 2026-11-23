@@ -204,16 +204,26 @@ const HARVEST_DAYS = [
   { id:'2027-01-16-pereira', date:'2027-01-16', farmer:'pereira', crop:'couve', what:{pt:'Couves e brócolos',en:'Cabbage and broccoli'}, time:'10h–13h', spots:30 }
 ];
 
+/* tipos de cozinha que um restaurante pode escolher (filtro na página dos restaurantes) */
+const CUISINES = [
+  { id: 'portuguesa', pt: 'Cozinha portuguesa', en: 'Portuguese' }, { id: 'peixe', pt: 'Peixe e marisco', en: 'Fish and seafood' },
+  { id: 'vegetariana', pt: 'Vegetariana', en: 'Vegetarian' }, { id: 'vegana', pt: 'Vegana', en: 'Vegan' },
+  { id: 'mediterranica', pt: 'Mediterrânica', en: 'Mediterranean' }, { id: 'bistro', pt: 'Bistrô', en: 'Bistro' },
+  { id: 'autor', pt: 'Cozinha de autor', en: 'Chef\'s cuisine' }, { id: 'petiscos', pt: 'Petiscos', en: 'Small plates' },
+  { id: 'grelhados', pt: 'Grelhados', en: 'Grill' }, { id: 'italiana', pt: 'Italiana', en: 'Italian' },
+  { id: 'asiatica', pt: 'Asiática', en: 'Asian' }, { id: 'brunch', pt: 'Brunch', en: 'Brunch' },
+  { id: 'cafe', pt: 'Café e refeições rápidas', en: 'Café and quick meals' }, { id: 'pastelaria', pt: 'Almoços e pastelaria', en: 'Lunches and pastries' }
+];
 /* ---------- Restaurantes com Selo Daqui (inventados) — x, y = posição no mapa de Aveiro ---------- */
 const RESTAURANTS = [
-  { id:'mesa-da-ria', name:'Mesa da Ria', lat:40.6446, lon:-8.6562, kind:{pt:'Peixe e marisco',en:'Fish and seafood'}, area:{pt:'Bairro da Beira-Mar, junto à Praça do Peixe',en:'Beira-Mar quarter, by Praça do Peixe'}, dish:{pt:'Robalo grelhado com batata da Gândara',en:'Grilled sea bass with Gândara potatoes'}, since:'2026-09' },
-  { id:'tasca-da-horta', name:'Tasca da Horta', lat:40.6424, lon:-8.6553, kind:{pt:'Cozinha portuguesa',en:'Portuguese cooking'}, area:{pt:'Rossio',en:'Rossio'}, dish:{pt:'Caldo verde com couve-galega da Família Pereira',en:'Caldo verde with the Pereira family\'s kale'}, since:'2026-10' },
-  { id:'moliceiro-verde', name:'Moliceiro Verde', lat:40.6430, lon:-8.6598, kind:{pt:'Vegetariano',en:'Vegetarian'}, area:{pt:'Canal Central',en:'Canal Central'}, dish:{pt:'Risoto de abóbora-manteiga e alho-francês',en:'Butternut squash and leek risotto'}, since:'2026-09' },
-  { id:'sal-e-campo', name:'Sal & Campo', lat:40.6478, lon:-8.6566, kind:{pt:'Bistrô',en:'Bistro'}, area:{pt:'Canal de São Roque',en:'Canal de São Roque'}, dish:{pt:'Salada de rúcula, pera Rocha e noz',en:'Rocket, Rocha pear and walnut salad'}, since:'2026-11' },
-  { id:'fonte-nova', name:'Bistrô Fonte Nova', lat:40.6408, lon:-8.6466, kind:{pt:'Cozinha de autor',en:'Chef\'s cuisine'}, area:{pt:'Canal do Cojo, junto ao Centro de Congressos',en:'Canal do Cojo, by the Congress Centre'}, dish:{pt:'Cachaço de porco com castanhas de Vinhais',en:'Pork with Vinhais chestnuts'}, since:'2026-10' },
-  { id:'cantina-do-parque', name:'Cantina do Parque', lat:40.6358, lon:-8.6488, kind:{pt:'Almoços e pastelaria',en:'Lunches and pastries'}, area:{pt:'Parque Infante D. Pedro',en:'Infante D. Pedro park'}, dish:{pt:'Tarte de maçã Reineta',en:'Reineta apple tart'}, since:'2026-11' },
-  { id:'cafe-campus', name:'Café Campus', lat:40.6318, lon:-8.6578, kind:{pt:'Café e refeições rápidas',en:'Café and quick meals'}, area:{pt:'Universidade de Aveiro',en:'University of Aveiro'}, dish:{pt:'Sopa do dia com legumes da Horta Viva',en:'Soup of the day with Horta Viva vegetables'}, since:'2026-10' },
-  { id:'estacao-74', name:'Estação 74', lat:40.6431, lon:-8.6418, kind:{pt:'Petiscos',en:'Small plates'}, area:{pt:'Junto à estação',en:'By the railway station'}, dish:{pt:'Pimentos assados de Torres Vedras',en:'Roast peppers from Torres Vedras'}, since:'2026-11' }
+  { id:'mesa-da-ria', name:'Mesa da Ria', cuisine:'peixe', lat:40.6446, lon:-8.6562, kind:{pt:'Peixe e marisco',en:'Fish and seafood'}, area:{pt:'Bairro da Beira-Mar, junto à Praça do Peixe',en:'Beira-Mar quarter, by Praça do Peixe'}, dish:{pt:'Robalo grelhado com batata da Gândara',en:'Grilled sea bass with Gândara potatoes'}, since:'2026-09' },
+  { id:'tasca-da-horta', name:'Tasca da Horta', cuisine:'portuguesa', lat:40.6424, lon:-8.6553, kind:{pt:'Cozinha portuguesa',en:'Portuguese cooking'}, area:{pt:'Rossio',en:'Rossio'}, dish:{pt:'Caldo verde com couve-galega da Família Pereira',en:'Caldo verde with the Pereira family\'s kale'}, since:'2026-10' },
+  { id:'moliceiro-verde', name:'Moliceiro Verde', cuisine:'vegetariana', dishVeg:true, lat:40.6430, lon:-8.6598, kind:{pt:'Vegetariano',en:'Vegetarian'}, area:{pt:'Canal Central',en:'Canal Central'}, dish:{pt:'Risoto de abóbora-manteiga e alho-francês',en:'Butternut squash and leek risotto'}, since:'2026-09' },
+  { id:'sal-e-campo', name:'Sal & Campo', cuisine:'bistro', dishVeg:true, dishVegan:true, lat:40.6478, lon:-8.6566, kind:{pt:'Bistrô',en:'Bistro'}, area:{pt:'Canal de São Roque',en:'Canal de São Roque'}, dish:{pt:'Salada de rúcula, pera Rocha e noz',en:'Rocket, Rocha pear and walnut salad'}, since:'2026-11' },
+  { id:'fonte-nova', name:'Bistrô Fonte Nova', cuisine:'autor', lat:40.6408, lon:-8.6466, kind:{pt:'Cozinha de autor',en:'Chef\'s cuisine'}, area:{pt:'Canal do Cojo, junto ao Centro de Congressos',en:'Canal do Cojo, by the Congress Centre'}, dish:{pt:'Cachaço de porco com castanhas de Vinhais',en:'Pork with Vinhais chestnuts'}, since:'2026-10' },
+  { id:'cantina-do-parque', name:'Cantina do Parque', cuisine:'pastelaria', dishVeg:true, lat:40.6358, lon:-8.6488, kind:{pt:'Almoços e pastelaria',en:'Lunches and pastries'}, area:{pt:'Parque Infante D. Pedro',en:'Infante D. Pedro park'}, dish:{pt:'Tarte de maçã Reineta',en:'Reineta apple tart'}, since:'2026-11' },
+  { id:'cafe-campus', name:'Café Campus', cuisine:'cafe', dishVeg:true, dishVegan:true, lat:40.6318, lon:-8.6578, kind:{pt:'Café e refeições rápidas',en:'Café and quick meals'}, area:{pt:'Universidade de Aveiro',en:'University of Aveiro'}, dish:{pt:'Sopa do dia com legumes da Horta Viva',en:'Soup of the day with Horta Viva vegetables'}, since:'2026-10' },
+  { id:'estacao-74', name:'Estação 74', cuisine:'petiscos', dishVeg:true, dishVegan:true, lat:40.6431, lon:-8.6418, kind:{pt:'Petiscos',en:'Small plates'}, area:{pt:'Junto à estação',en:'By the railway station'}, dish:{pt:'Pimentos assados de Torres Vedras',en:'Roast peppers from Torres Vedras'}, since:'2026-11' }
 ];
 
 /* ---------- Perguntas frequentes ---------- */

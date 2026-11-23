@@ -399,6 +399,8 @@ function aveiroMapSVG(markers, lang, active, opts = {}) {
   return `<svg class="avmap" viewBox="0 0 640 548" role="img" aria-label="${en ? 'Map of Aveiro city centre' : 'Mapa do centro de Aveiro'}">
     <defs>
       <clipPath id="av-clip"><rect width="640" height="548" rx="18"/></clipPath>
+      <filter id="av-f1" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="0.35"/><feComponentTransfer><feFuncR type="linear" slope="0.8" intercept="0.19"/><feFuncG type="linear" slope="0.8" intercept="0.18"/><feFuncB type="linear" slope="0.8" intercept="0.15"/></feComponentTransfer></filter>
+      <filter id="av-f2" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope="0.5" intercept="0.48"/><feFuncG type="linear" slope="0.5" intercept="0.49"/><feFuncB type="linear" slope="0.5" intercept="0.47"/></feComponentTransfer></filter>
       <pattern id="av-blocks" width="24" height="19" patternUnits="userSpaceOnUse" patternTransform="rotate(-14)"><rect width="24" height="19" fill="#FAF8F0"/><rect x="2" y="2" width="20" height="15" rx="2" fill="#E8E3D2"/></pattern>
       <pattern id="av-blocks2" width="30" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(8)"><rect width="30" height="22" fill="#FAF8F0"/><rect x="2" y="2" width="26" height="18" rx="2" fill="#ECE8DA"/></pattern>
       <pattern id="av-pans" width="20" height="15" patternUnits="userSpaceOnUse" patternTransform="rotate(-8)"><rect width="20" height="15" fill="${Wd}"/><rect x="1.5" y="1.5" width="17" height="12" fill="#E2ECE8"/></pattern>
@@ -438,7 +440,7 @@ function aveiroMapSVG(markers, lang, active, opts = {}) {
     ${lab(268, 120, 'Beira-Mar', { s: 10, c: '#8A8A70' })}${lab(408, 404, 'Glória', { s: 10, c: '#8A8A70' })}${lab(480, 56, 'Esgueira', { s: 10, c: '#8A8A70' })}
     ${lab(120, 96, en ? 'Salt pans' : 'Salinas', { s: 11, c: '#4D6A6A', it: 1, halo: '#E2ECE8' })}${lab(120, 350, en ? 'Salt pans' : 'Salinas', { s: 11, c: '#4D6A6A', it: 1, halo: '#E2ECE8' })}
     ${lab(26, 380, 'Ria de Aveiro', { s: 12, c: '#3E6E6A', it: 1, r: -82, halo: W })}
-    ${opts.drawn ? '' : `<g class="av-tiles">${tiles}</g>`}
+    ${opts.drawn ? '' : `<g class="av-tiles"${(typeof LOOK !== 'undefined' && LOOK.map) ? ` filter="url(#av-f${LOOK.map})"` : ''}>${tiles}</g>`}
     <g transform="translate(596 40)"><circle r="16" fill="#fff" opacity=".85"/><path d="M0-12L5 4 0 1-5 4Z" fill="${C.campo}"/><text y="13" text-anchor="middle" font-size="9" font-weight="700" fill="${C.campo}">N</text></g>
     <g transform="translate(520 520)"><rect x="-6" y="-14" width="110" height="24" rx="6" fill="#fff" opacity=".85"/><path d="M0 0h95" stroke="${C.folha}" stroke-width="2"/><path d="M0-4v8M95-4v8M47.5-3v6" stroke="${C.folha}" stroke-width="1.5"/><text x="47" y="-4" text-anchor="middle" font-size="9" fill="${C.folha}">500 m</text></g>
     ${opts.drawn ? lab(14, 536, en ? 'Approximate positions' : 'Posições aproximadas', { s: 10, c: '#4D6A6A', it: 1, halo: W }) : `<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener"><rect x="8" y="526" width="${CARTO ? 226 : 172}" height="16" rx="4" fill="#fff" opacity=".85"/><text x="14" y="537.5" font-size="9.5" fill="#4D5A3F">© OpenStreetMap contributors${CARTO ? ' © CARTO' : ''}</text></a>`}
@@ -473,6 +475,17 @@ function sealSVG(cls = '', lang = 'pt') {
 
 /* ===== UI line icons (24x24, stroke=currentColor) ===== */
 const IC = {
+  doc: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+  wallet: '<path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1V7z"/><path d="M4 7l11-3v3M16 13.5h2"/>',
+  gift: '<rect x="4" y="9" width="16" height="11" rx="1"/><path d="M3 9h18v-2H3zM12 7v13M12 7c-1-3-5-4-5-1.5S12 7 12 7zm0 0c1-3 5-4 5-1.5S12 7 12 7z"/>',
+  receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
+  sound: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+  layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  crosshair: '<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
   send: '<path d="M4 12l16-8-6 16-3-7z"/><path d="M11 13l9-9"/>',

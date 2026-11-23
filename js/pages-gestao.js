@@ -5,9 +5,10 @@
 const REQ_TYPES = () => ({ selo: T('Pedido de Selo Daqui', 'Daqui seal application'), agricultor: T('Adesão de agricultor', 'Farmer sign-up'), produto: T('Proposta de produto', 'Product proposal'),
   colhe: T('Proposta de Colhe Connosco', 'Join the Harvest proposal'), frio: T('Armazenamento em frio', 'Cold storage'), gerir: T('Gerir encomenda', 'Manage order'), seguimento: T('Seguimento', 'Tracking'),
   incidencia: T('Incidência', 'Problem report'), contacto: T('Mensagem', 'Message'), fundador: T('Membro fundador', 'Founding member') });
-const ADMIN_TABS = ['pedidos', 'mensagens', 'encomendas', 'catalogo', 'caixas', 'colhe', 'subscricoes', 'contas', 'exportar'];
+const ADMIN_TABS = ['pedidos', 'mensagens', 'encomendas', 'preparar', 'inventario', 'catalogo', 'caixas', 'parceiros', 'colhe', 'subscricoes', 'promocoes', 'contas', 'definicoes', 'exportar'];
+const ADMIN_EXTRA = {};   // separadores acrescentados em js/pages-gestao2.js: { chave: [nome(), desenhar()] }
 let adminTab = ADMIN_TABS.includes(QS.get('tab')) ? QS.get('tab') : 'pedidos';
-let inboxFilter = 'novo', catQuery = '', catFilter = 'all', accFilter = 'all';
+let inboxFilter = 'novo', catQuery = '', catFilter = 'all', accFilter = 'all', inboxFrom = iso(addDays(today(), -7)), inboxTo = iso(today());
 const monthOpts = sel => Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}"${+sel === i + 1 ? ' selected' : ''}>${monthName(i + 1, 'short')}</option>`).join('');
 const UNIT_OPTS = sel => [['kg', 'kg'], ['un', T('unidade', 'each')], ['molho', T('molho', 'bunch')], ['cuv', T('cuvete', 'punnet')]].map(([v, n]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${n}</option>`).join('');
 
@@ -17,7 +18,8 @@ function adminPanel() {
   const nNew = REQUESTS.filter(r => r.status === 'novo').length;
   const nMsg = typeof chatUnread === 'function' ? chatUnread() : 0;
   const names = { pedidos: T('Pedidos e avisos', 'Requests'), mensagens: T('Mensagens', 'Messages'), encomendas: T('Encomendas', 'Orders'), catalogo: T('Catálogo', 'Catalogue'), caixas: T('Caixas e preços', 'Boxes and prices'), colhe: JTH(), subscricoes: T('Subscrições', 'Subscriptions'), contas: T('Contas', 'Accounts'), exportar: T('Guardar alterações', 'Save changes') };
-  const body = { pedidos: tabPedidos, mensagens: tabMensagens, encomendas: tabEncomendas, catalogo: tabCatalogo, caixas: tabCaixas, colhe: tabColhe, subscricoes: tabSubs, contas: tabContas, exportar: tabExportar }[adminTab]();
+  Object.entries(ADMIN_EXTRA).forEach(([k, [n]]) => { names[k] = n(); });
+  const body = (Object.assign({ pedidos: tabPedidos, mensagens: tabMensagens, encomendas: tabEncomendas, catalogo: tabCatalogo, caixas: tabCaixas, colhe: tabColhe, subscricoes: tabSubs, contas: tabContas, exportar: tabExportar }, Object.fromEntries(Object.entries(ADMIN_EXTRA).map(([k, v]) => [k, v[1]])))[adminTab] || tabPedidos)();
   return `<section class="acc-sec"><div class="row-between"><h2>${T('Painel de gestão', 'Management panel')}</h2>${NUVEM.badge()}</div>
     <div class="kpis"><div><strong>${nNew}</strong><span>${T('pedidos novos', 'new requests')}</span></div><div><strong>${ORDERS.filter(o => orderStage(o) < 3).length}</strong><span>${T('encomendas por entregar', 'orders to deliver')}</span></div><div><strong>${subs.filter(x => x.s.status === 'ativa').length}</strong><span>${T('subscrições ativas', 'active subscriptions')}</span></div><div><strong>${clients.length}</strong><span>${T('contas registadas', 'registered accounts')}</span></div></div>
     <nav class="admin-tabs" role="tablist" aria-label="${T('Secções do painel', 'Panel sections')}">${ADMIN_TABS.map(k => `<button role="tab" data-admin-tab="${k}" aria-selected="${adminTab === k}">${names[k]}${k === 'pedidos' && nNew ? ` <span class="count-in">${nNew}</span>` : ''}${k === 'mensagens' && nMsg ? ` <span class="count-in">${nMsg}</span>` : ''}${k === 'exportar' && catalogChangeCount() ? ` <span class="count-in">${catalogChangeCount()}</span>` : ''}</button>`).join('')}</nav></section>
@@ -46,8 +48,10 @@ function mergeChoice(r) {
 }
 function tabPedidos() {
   const types = REQ_TYPES(), all = REQUESTS.slice().sort((a, b) => b.created.localeCompare(a.created)), labels = REQ_LABELS();
-  const counts = k => k === 'novo' ? all.filter(r => r.status === 'novo').length : k === 'all' ? all.length : all.filter(r => r.type === k).length;
-  const shown = all.filter(r => inboxFilter === 'all' ? true : inboxFilter === 'novo' ? r.status === 'novo' : r.type === inboxFilter);
+  const inR = r => { const d = String(r.created).slice(0, 10); return d >= inboxFrom && d <= inboxTo; };
+  const counts = k => { const a = all.filter(inR); return k === 'novo' ? a.filter(r => r.status === 'novo').length : k === 'all' ? a.length : a.filter(r => r.type === k).length; };
+  const inRange = r => { const d = String(r.created).slice(0, 10); return d >= inboxFrom && d <= inboxTo; };
+  const shown = all.filter(inRange).filter(r => inboxFilter === 'all' ? true : inboxFilter === 'novo' ? r.status === 'novo' : r.type === inboxFilter);
   const who = r => { const uu = r.user && USERS[r.user]; return uu ? `${esc(uu.name)} (${esc(uu.username)})` : esc(r.fields?.name || r.fields?.person || T('Visitante sem conta', 'Guest')); };
   const card = r => `<article class="req${r.status === 'novo' ? ' is-new' : ''}">
     <div class="row-between"><div class="row-gap"><span class="rtype t-${r.type}">${types[r.type] || r.type}</span><b>${r.id}</b>${r.order ? `<span class="small">${T('Encomenda', 'Order')} ${r.order}</span>` : ''}${decisionBadge(r)}</div>
@@ -62,7 +66,10 @@ function tabPedidos() {
   return `<section class="acc-sec"><h2>${T('Pedidos e avisos', 'Requests and alerts')}</h2>
     <p class="muted mt-s">${T('Tudo o que é submetido no site: pedidos de selo, adesões de agricultores e restaurantes, propostas de produtos e de dias Colhe Connosco, incidências, gestão e seguimento de encomendas, mensagens e membros fundadores.', 'Everything submitted on the site: seal and farmer applications, product and Join the Harvest proposals, problem reports, order management and tracking, messages and founding members.')}</p>
     <div class="chips mt-s mb-s" role="group" aria-label="${T('Filtrar pedidos', 'Filter requests')}">${[['novo', T('Novos', 'New')], ['all', T('Todos', 'All')], ...Object.entries(types)].map(([k, n]) => `<button class="chip" data-inbox="${k}" aria-pressed="${inboxFilter === k}">${n} <span class="small muted">${counts(k)}</span></button>`).join('')}</div>
-    <div class="inbox">${shown.length ? shown.map(card).join('') : `<p class="muted">${T('Nada por tratar aqui.', 'Nothing to handle here.')}</p>`}</div></section>`;
+    <form class="range-row" data-inbox-range><span class="lbl">${T('Mostrar de', 'Show from')}</span><label class="sr" for="ib-from">${T('Início', 'Start')}</label><input type="date" id="ib-from" value="${inboxFrom}" max="${inboxTo}">
+      <span class="lbl">${T('a', 'to')}</span><label class="sr" for="ib-to">${T('Fim', 'End')}</label><input type="date" id="ib-to" value="${inboxTo}" min="${inboxFrom}">
+      <button type="button" class="chip" data-inbox-days="7" aria-pressed="${inboxFrom === iso(addDays(today(), -7)) && inboxTo === iso(today())}">${T('Últimos 7 dias', 'Last 7 days')}</button><button type="button" class="chip" data-inbox-days="30">${T('30 dias', '30 days')}</button><button type="button" class="chip" data-inbox-days="365">${T('Um ano', 'One year')}</button></form>
+    <div class="inbox">${shown.length ? shown.map(card).join('') : `<p class="muted">${T('Nada neste intervalo.', 'Nothing in this date range.')}</p>`}</div></section>`;
 }
 function uniqueId(base, list) { let id = slugify(base) || 'novo', n = 2; while (list.some(x => x.id === id)) id = `${slugify(base)}-${n++}`; return id; }
 /* produtos com vários produtores: grava a lista de produtores e o que depende dela */
@@ -255,6 +262,7 @@ function tabCaixas() {
       <div class="row-between"><div class="row-gap"><span class="thumb lg">${artFor(b)}</span><div><h3>${esc(L(b.name))}</h3>${b.custom ? `<span class="small muted">${T('Criada na gestão', 'Created by management')} · ${(b.items || []).length} ${T('produtos', 'products')}: ${(b.items || []).map(id => P(id)).filter(Boolean).slice(0, 6).map(x => esc(L(x.name))).join(', ')}${(b.items || []).length > 6 ? '…' : ''}</span>` : ''}</div></div>
         ${b.custom ? (list.length ? `<span class="small muted">${T('Tem subscritores: não pode ser apagada', 'Has subscribers: cannot be deleted')}</span>` : `<button class="btn btn-line btn-sm c-tomato" data-box-del="${b.id}">${icon('trash', 16)} ${T('Apagar caixa', 'Delete box')}</button>`) : ''}</div>
       <div class="row-gap mt-s">${BOX_SIZES[b.id].map(s => `<label class="field inl"><span class="lbl">${sizeName(s.s)}, ${s.kg} kg (€)</span><input class="num" type="number" step="0.10" min="0" value="${s.price}" data-box-price="${b.id}:${s.s}"></label>`).join('')}</div>
+      ${boxEditor(b, list)}
       ${list.length ? `<table class="tbl mt-s"><thead><tr><th>${T('Subscritor', 'Subscriber')}</th><th>${T('Tamanho', 'Size')}</th><th>${T('Preço guardado', 'Saved price')}</th><th>${T('Preço atual', 'Current price')}</th><th>${T('Paga por caixa', 'Pays per box')}</th></tr></thead><tbody>${list.map(({ c, s }) => { refreshSub(s); const cur = boxCurrentPrice(s.box, s.size); return `<tr><td>${esc(c.name)}</td><td>${sizeName(s.size)}</td><td>${money(s.locked)}</td><td>${money(cur)}</td><td><b>${money(Math.min(cur, s.locked))}</b>${cur > s.locked ? ` <span class="small muted">(${T('poupa', 'saves')} ${money(cur - s.locked)})</span>` : ''}</td></tr>`; }).join('')}</tbody></table>` : `<p class="small muted mt-s">${T('Sem subscritores.', 'No subscribers.')}</p>`}
     </div>`; }).join('')}</section>`;
 }
@@ -271,11 +279,12 @@ function harvestDoneCard(d) {
     ${list.length ? `<div class="tbl-wrap mt-s"><table class="tbl"><thead><tr><th>${T('Participante', 'Participant')}</th><th>${T('Avaliação', 'Review')}</th><th>${T('Registo de colheita', 'Harvest record')}</th></tr></thead><tbody>${list.map(x => { const h = (x.user.harvests || []).find(y => hIs(y, d)) || {}, rec = h.record || {};
       return `<tr><td><b>${esc(x.user.name)}</b><br><span class="small muted">${esc(x.user.phone)} · ${x.people} ${x.people > 1 ? T('pessoas', 'people') : T('pessoa', 'person')}</span></td>
         <td>${h.rating ? `<ul class="reviews compact">${reviewItem(d, { user: x.user.username, name: firstName(x.user.name), rating: +h.rating, comment: h.comment || '', reply: h.reply ? h.reply.text : '' }, true)}</ul>` : `<span class="small muted">${harvestRateOpen(d) ? T('ainda não avaliou', 'not reviewed yet') : T('sem avaliação', 'no review')}</span>`}</td>
-        <td><div class="row-gap"><label class="sr" for="rg-kg-${rid(x.user.username)}">kg</label><input class="num" id="rg-kg-${rid(x.user.username)}" type="number" min="0" step="0.1" value="${rec.kg ?? ''}" placeholder="kg" data-rg-kg="${rid(x.user.username)}"${pr ? ` data-rg-unit="${pr.price}"` : ''}>
+        <td>${d.date !== iso(today()) ? (rec.at ? `<span class="small"><b>${numFmt(rec.kg || 0)} kg</b>${rec.price != null ? ` · ${money(rec.price)}` : ''}${rec.note ? ` · ${esc(rec.note)}` : ''}</span><br><span class="small muted">${recId(h, d, x.user.username)}</span>` : `<span class="small muted">${T('Sem registo.', 'Not recorded.')}</span>`)
+          + `<p class="small muted">${icon('lock', 14)} ${d.date > iso(today()) ? T('O registo abre no dia do evento.', 'Recording opens on the day of the event.') : T('O registo só podia ser feito no dia do evento.', 'Records could only be made on the day of the event.')}</p>` : `<div class="row-gap"><label class="sr" for="rg-kg-${rid(x.user.username)}">kg</label><input class="num" id="rg-kg-${rid(x.user.username)}" type="number" min="0" step="0.1" value="${rec.kg ?? ''}" placeholder="kg" data-rg-kg="${rid(x.user.username)}"${pr ? ` data-rg-unit="${pr.price}"` : ''}>
           <label class="sr" for="rg-pr-${rid(x.user.username)}">${T('Valor pago (€)', 'Amount paid (€)')}</label><input class="num" id="rg-pr-${rid(x.user.username)}" type="number" min="0" step="0.01" value="${rec.price ?? ''}" placeholder="€"${rec.price != null ? ' data-touched="1"' : ''}>
           <label class="sr" for="rg-nt-${rid(x.user.username)}">${T('Nota', 'Note')}</label><input class="sel" id="rg-nt-${rid(x.user.username)}" value="${esc(rec.note || '')}" placeholder="${T('Nota (opcional)', 'Note (optional)')}">
           <button class="btn btn-line btn-sm c-campo" data-reg-save="${d.id}|${x.user.username}">${rec.at ? T('Atualizar', 'Update') : T('Registar', 'Record')}</button></div>
-          ${rec.at ? `<span class="small muted">${recId(h, d, x.user.username)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : `<p class="small muted mt-s">${T('Sem inscritos.', 'No sign-ups.')}</p>`}
+          ${rec.at ? `<span class="small muted">${recId(h, d, x.user.username)}</span>` : ''}`}</td></tr>`; }).join('')}</tbody></table></div>` : `<p class="small muted mt-s">${T('Sem inscritos.', 'No sign-ups.')}</p>`}
   </article>`;
 }
 function tabColhe() {
@@ -387,18 +396,18 @@ PAGE_EVENTS.change.push((e, t) => {
   if (d.orderStage) { const o = findOrder(d.orderStage); if (t.value === 'cancel') { o.status = 'cancelada'; delete o.stage; } else { o.status = 'ativa'; if (t.value === 'auto') delete o.stage; else o.stage = +t.value; } saveOrders(); toast(`${o.num}: ${stageName(o)}`); return; }
   if (d.catEdit) {
     const id = d.catEdit, p = P(id), row = t.closest('tr');
-    if (d.f === 'price') { const v = Math.max(0, +t.value || 0); saveCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { price: +v.toFixed(2) }); }); toast(T(`Preço de ${L(p.name)}: ${money(v)}`, `${L(p.name)} price: ${money(v)}`)); }
-    if (d.f === 's0' || d.f === 's1') { const a = +$('[data-f="s0"]', row).value, b = +$('[data-f="s1"]', row).value; saveCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { season: [a, b] }); }); toast(T(`Época de ${L(p.name)}: ${monthName(a, 'short')}–${monthName(b, 'short')}`, `${L(p.name)} season: ${monthName(a, 'short')}–${monthName(b, 'short')}`)); }
+    if (d.f === 'price') { const v = Math.max(0, +t.value || 0); editCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { price: +v.toFixed(2) }); }); toast(T(`Preço de ${L(p.name)}: ${money(v)}`, `${L(p.name)} price: ${money(v)}`)); }
+    if (d.f === 's0' || d.f === 's1') { const a = +$('[data-f="s0"]', row).value, b = +$('[data-f="s1"]', row).value; editCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { season: [a, b] }); }); toast(T(`Época de ${L(p.name)}: ${monthName(a, 'short')}–${monthName(b, 'short')}`, `${L(p.name)} season: ${monthName(a, 'short')}–${monthName(b, 'short')}`)); }
     if (d.f.startsWith('sp')) { const sp = ['sp0', 'sp1', 'sp2'].map(k => Math.round(+$(`[data-f="${k}"]`, row).value || 0)); const sum = sp.reduce((x, y) => x + y, 0);
       $$('.pct', row).forEach(i => i.toggleAttribute('aria-invalid', sum !== 100));
       if (sum !== 100) { toast(T(`A soma dá ${sum}%: tem de dar 100%`, `The total is ${sum}%: it must be 100%`)); return; }
-      saveCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { split: sp }); }); toast(T(`Divisão de ${L(p.name)}: ${sp.join(' / ')}`, `${L(p.name)} split: ${sp.join(' / ')}`)); }
-    if (d.f === 'stock') { if (p.producers && p.producers.length) saveOffers(p, p.producers.map(o => Object.assign({}, o, { outOfStock: t.checked }))); else saveCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { outOfStock: t.checked }); }); toast(t.checked ? T(`${L(p.name)}: fora de stock`, `${L(p.name)}: out of stock`) : T(`${L(p.name)}: com stock`, `${L(p.name)}: in stock`)); }
+      editCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { split: sp }); }); toast(T(`Divisão de ${L(p.name)}: ${sp.join(' / ')}`, `${L(p.name)} split: ${sp.join(' / ')}`)); }
+    if (d.f === 'stock') { if (p.producers && p.producers.length) saveOffers(p, p.producers.map(o => Object.assign({}, o, { outOfStock: t.checked }))); else editCatalog(ch => { ch.products = ch.products || {}; ch.products[id] = Object.assign(ch.products[id] || {}, { outOfStock: t.checked }); }); toast(t.checked ? T(`${L(p.name)}: fora de stock`, `${L(p.name)}: out of stock`) : T(`${L(p.name)}: com stock`, `${L(p.name)}: in stock`)); }
     return;
   }
   if (d.catf !== undefined && t.id === 'cat-f') { catFilter = t.value; $('#cat-body').innerHTML = catRows(); return; }
-  if (d.boxPrice) { const [id, sz] = d.boxPrice.split(':'), v = Math.max(0, +t.value || 0); saveCatalog(ch => { ch.boxes = ch.boxes || {}; ch.boxes[id] = Object.assign(ch.boxes[id] || {}, { [sz]: +v.toFixed(2) }); }); Object.values(USERS).forEach(c => (c.subs || []).forEach(sb => refreshSub(sb))); saveUsers(); toast(T('Preço da caixa atualizado', 'Box price updated')); rerenderKeep(`[data-box-price="${d.boxPrice}"]`); return; }
-  if (d.daySpots) { const v = Math.max(+t.min || 1, +t.value || 1); saveCatalog(ch => { ch.harvestDays = HARVEST_DAYS.map(x => Object.assign({}, x, x.id === d.daySpots ? { spots: v } : {})); }); toast(T(`Máximo de participantes: ${v}`, `Maximum participants: ${v}`)); return; }
+  if (d.boxPrice) { const [id, sz] = d.boxPrice.split(':'), v = Math.max(0, +t.value || 0); editCatalog(ch => { ch.boxes = ch.boxes || {}; ch.boxes[id] = Object.assign(ch.boxes[id] || {}, { [sz]: +v.toFixed(2) }); }); Object.values(USERS).forEach(c => (c.subs || []).forEach(sb => refreshSub(sb))); saveUsers(); toast(T('Preço da caixa atualizado', 'Box price updated')); rerenderKeep(`[data-box-price="${d.boxPrice}"]`); return; }
+  if (d.daySpots) { const v = Math.max(+t.min || 1, +t.value || 1); editCatalog(ch => { ch.harvestDays = HARVEST_DAYS.map(x => Object.assign({}, x, x.id === d.daySpots ? { spots: v } : {})); }); toast(T(`Máximo de participantes: ${v}`, `Maximum participants: ${v}`)); return; }
   if (d.ndFarm !== undefined && t.id === 'nd-farm') { $('#nd-prod').innerHTML = ofFarmer(t.value).map(p => `<option value="${p.id}">${esc(L(p.name))}</option>`).join(''); return; }
 });
 PAGE_EVENTS.input.push((e, t) => {

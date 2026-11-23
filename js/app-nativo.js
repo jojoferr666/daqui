@@ -42,16 +42,46 @@ const NATIVO = (() => {
       let st = await PN.checkPermissions();
       if (st.receive === 'prompt' || st.receive === 'prompt-with-rationale') { if (!ask && store.get('daqui-push-perguntado', false)) return; store.set('daqui-push-perguntado', true); st = await PN.requestPermissions(); }
       if (st.receive !== 'granted') { N.pushState = 'denied'; return; }
-      await PN.createChannel({ id: 'daqui', name: 'Daqui', description: T('Encomendas, pedidos e lembretes', 'Orders, requests and reminders'), importance: 4, visibility: 1, lights: true, lightColor: '#3C6104', vibration: true }).catch(() => {});
+      /* canal com o som próprio da Daqui (android/app/src/main/res/raw/daqui_notificacao.wav, copiado por npm run configurar);
+         os canais do Android não mudam depois de criados, por isso o canal com som tem um id novo ("daqui_som") */
+      await PN.createChannel({ id: 'daqui_som', name: 'Daqui', description: T('Encomendas, promoções e lembretes', 'Orders, promotions and reminders'), importance: 4, visibility: 1, lights: true, lightColor: '#3C6104', vibration: true, sound: 'daqui_notificacao.wav' }).catch(() => {});
+      if (PN.deleteChannel) PN.deleteChannel({ id: 'daqui' }).catch(() => {});
       if (!listening) {
         listening = true;
         PN.addListener('registration', t => { N.pushState = 'on'; NUVEM.pushToken = t.value; store.set('daqui-push-token', t.value); NUVEM.registerDevice(t.value, 'android').catch(e => console.warn(e)); });
         PN.addListener('registrationError', e => { N.pushState = 'error'; console.warn('push', e); });
-        PN.addListener('pushNotificationReceived', n => { toast(`${n.title || 'Daqui'}: ${n.body || ''}`); NUVEM.refresh(); });
+        PN.addListener('pushNotificationReceived', n => { if (typeof playSound === 'function') playSound('notif'); toast(`${n.title || 'Daqui'}: ${n.body || ''}`); NUVEM.refresh(); });
         PN.addListener('pushNotificationActionPerformed', a => { const r = a.notification && a.notification.data && a.notification.data.rota; if (r) location.hash = r; });
       }
       await PN.register();
     } catch (e) { N.pushState = 'error'; console.warn('push', e); }
+  };
+  /* permissões (Definições → Permissões da app): estado e pedido */
+  N.permissions = async () => {
+    const out = { push: 'prompt', location: 'prompt', camera: 'prompt' };
+    try {
+      if (isNative) {
+        if (P.PushNotifications) out.push = (await P.PushNotifications.checkPermissions()).receive;
+        if (P.Geolocation) out.location = (await P.Geolocation.checkPermissions()).location;
+        if (P.Camera) out.camera = (await P.Camera.checkPermissions()).camera;
+      } else {
+        if (typeof Notification !== 'undefined') out.push = Notification.permission === 'default' ? 'prompt' : Notification.permission;
+        if (navigator.permissions) { for (const [k, n] of [['location', 'geolocation'], ['camera', 'camera']]) { try { out[k] = (await navigator.permissions.query({ name: n })).state; } catch (e) {} } }
+      }
+    } catch (e) {}
+    return out;
+  };
+  N.askPermission = async kind => {
+    if (kind === 'push') { if (isNative) return N.pushStart(true); if (typeof Notification !== 'undefined') return Notification.requestPermission(); return; }
+    if (kind === 'location') return N.position().catch(() => {});
+    if (kind === 'camera') { if (isNative && P.Camera) return P.Camera.requestPermissions({ permissions: ['camera'] }); if (navigator.mediaDevices) { const st = await navigator.mediaDevices.getUserMedia({ video: true }); st.getTracks().forEach(t => t.stop()); } }
+  };
+  /* guardar ou partilhar um ficheiro (faturas em PDF): na app usa Filesystem + Share; sem esses plugins, abre no navegador */
+  N.shareFile = async (blob, name) => {
+    if (!isNative || !P.Filesystem || !P.Share) throw new Error('sem-plugins');
+    const b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(blob); });
+    const f = await P.Filesystem.writeFile({ path: name, data: b64, directory: 'CACHE' });
+    await P.Share.share({ title: name, url: f.uri, dialogTitle: T('Guardar ou enviar a fatura', 'Save or send the invoice') });
   };
   /* a língua das notificações acompanha a da app */
   N.pushLanguage = () => { const t = store.get('daqui-push-token', ''); if (t && NUVEM.on && NUVEM.hasSession()) NUVEM.registerDevice(t, 'android').catch(() => {}); };

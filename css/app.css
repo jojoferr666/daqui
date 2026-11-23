@@ -368,3 +368,69 @@ body.app .cat-tbl td .num.pct{width:56px}
 body.app .cat-tbl td .sel.sm{max-width:86px}
 body.app .acc-sec{overflow-wrap:anywhere}
 body.app #main{overflow-x:clip}
+
+/* =====================================================================================
+   v11 (app): sininho, Colhe Connosco no início, definições, transições, abertura e promoções
+   ===================================================================================== */
+body.app .a-hero-btn{position:relative;width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.14);color:var(--pera);text-decoration:none}
+body.app .a-hero-btn:active{transform:scale(.94)}
+body.app .a-colhe{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center;background:linear-gradient(135deg,var(--campo),#557F12);color:#fff;border-radius:22px;padding:14px;text-decoration:none;box-shadow:0 14px 30px rgba(60,97,4,.28);position:relative;overflow:hidden}
+body.app .a-colhe::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:rgba(242,198,99,.18)}
+body.app .a-colhe-art{border-radius:16px;overflow:hidden;background:var(--pera-l)}
+body.app .a-colhe-art svg{display:block;width:100%;height:auto}
+body.app .a-colhe-b{display:grid;gap:3px;position:relative;z-index:1;line-height:1.3}
+body.app .a-colhe-b b{font-family:var(--display);font-weight:400;font-size:1.35rem;color:var(--pera)}
+body.app .a-colhe-tag{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;text-transform:none;color:#E6F0C8}
+body.app .a-colhe-cta{display:inline-flex;align-items:center;gap:4px;justify-self:start;margin-top:6px;background:var(--pera);color:var(--folha);border-radius:999px;padding:.35em .9em;font-weight:700;font-size:.9rem}
+body.app .a-chips .chip{flex:none}
+body.app .a-pad>.a-chips,body.app .a-pad .a-chips:first-child{margin-top:0;margin-bottom:10px}
+body.app .a-row-link{display:grid;place-items:center;width:36px;height:36px;color:var(--campo);flex:none}
+body.app .a-switch{appearance:none;-webkit-appearance:none;width:48px;height:28px;border-radius:999px;background:#CFD6BC;position:relative;flex:none;margin-left:auto;transition:background .2s;cursor:pointer}
+body.app .a-switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);transition:transform .2s}
+body.app .a-switch:checked{background:var(--campo)}
+body.app .a-switch:checked::after{transform:translateX(20px)}
+body.app .a-row .status{margin-left:auto;flex:none}
+body.app .look-maps{grid-template-columns:repeat(3,1fr);gap:8px}
+body.app .a-bell .notif-list li{background:#fff;border:1px solid var(--line)}
+body.app .a-bell .notif-list li.unread{background:var(--sage)}
+body.app .wallet{grid-template-columns:1fr}
+body.app .inv-list li{grid-template-columns:auto 1fr auto}
+body.app .inv-list li>.row-gap{grid-column:2 / -1}
+body.app .pin-pick{max-width:none}
+body.app .cover-opts,body.app .cover-now{max-width:none}
+body.app .prep-items select{max-width:150px}
+body.app .pending-bar{bottom:calc(76px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));border-radius:18px;padding:10px 10px 10px 16px;width:calc(100vw - 24px);justify-content:space-between}
+body.app .pending-bar span{font-size:.9rem}
+
+/* transições: deslizar para o lado ao entrar num ecrã, voltar para trás, e desvanecer entre separadores */
+body.app .a-main.a-enter-fwd{animation:aFwd .32s cubic-bezier(.2,.8,.2,1) both}
+body.app .a-main.a-enter-back{animation:aBack .32s cubic-bezier(.2,.8,.2,1) both}
+body.app .a-main.a-enter-fade{animation:aFade .24s ease-out both}
+@keyframes aFwd{from{transform:translateX(38%);opacity:.2}to{transform:none;opacity:1}}
+@keyframes aBack{from{transform:translateX(-30%);opacity:.2}to{transform:none;opacity:1}}
+@keyframes aFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+body.app.no-anim .a-main{animation:none!important}
+
+/* abertura: a pera desenha-se sobre o verde e o logótipo aparece */
+.a-splash{position:fixed;inset:0;z-index:1000;background:var(--campo);display:grid;place-items:center;transition:opacity .5s ease,transform .5s ease}
+.a-splash.out{opacity:0;transform:scale(1.06);pointer-events:none}
+.a-splash-in{display:grid;justify-items:center;gap:18px}
+.a-splash-pear{width:110px;height:auto;overflow:visible}
+.a-splash-pear .sp-body{fill:var(--pera);stroke:var(--pera);stroke-width:3;stroke-dasharray:420;stroke-dashoffset:420;fill-opacity:0;animation:spDraw .8s .1s ease-out forwards,spFill .4s .75s ease-out forwards;transform-origin:60px 100px}
+.a-splash-pear .sp-stem{fill:none;stroke:#E7D59A;stroke-width:5;stroke-linecap:round;stroke-dasharray:40;stroke-dashoffset:40;animation:spDraw .35s .7s ease-out forwards}
+.a-splash-pear .sp-leaf{fill:#9DC45A;transform-origin:64px 18px;transform:scale(0) rotate(-40deg);animation:spLeaf .45s .9s cubic-bezier(.3,1.6,.5,1) forwards}
+.a-splash-logo{width:150px;opacity:0;transform:translateY(8px);animation:spLogo .45s 1s ease-out forwards}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+@keyframes spFill{to{fill-opacity:1}}
+@keyframes spLeaf{to{transform:none}}
+@keyframes spLogo{to{opacity:1;transform:none}}
+
+/* janela de promoção ao abrir */
+body.app .a-promo-pop{text-align:center;display:grid;gap:8px;justify-items:center}
+body.app .a-promo-ic{width:76px;height:76px;border-radius:24px;background:var(--campo);color:var(--pera);display:grid;place-items:center;margin-top:6px}
+body.app .a-promo-val{font-family:var(--display);font-size:2.4rem;color:var(--campo);margin:0;line-height:1}
+body.app .a-promo-pop h2{margin:0}
+body.app .a-promo-pop .a-big-btn{width:100%}
+
+body.app .a-pad>.a-h2{margin:24px 0 10px}
+body.app .a-pad>.a-h2:first-child{margin-top:4px}

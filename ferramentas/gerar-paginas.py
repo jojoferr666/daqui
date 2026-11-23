@@ -18,11 +18,13 @@ boxes = re.findall(r"\{ id:'(caixa-[a-z0-9-]+)'", data)
 farmers_block = data[data.index('const FARMERS'):data.index('];', data.index('const FARMERS'))]
 farmers = re.findall(r"\{ id:'([a-z0-9-]+)', name:'([^']+)'", farmers_block)
 
-SCRIPTS = ['art', 'data', 'alteracoes', 'catalogo', 'analises', 'supabase-config', 'nuvem', 'auth', 'app', 'pages-loja', 'pages-info', 'pages-conta', 'pages-gestao', 'pages-parceiro']
+# muda a cada versão: obriga o navegador a ir buscar os ficheiros novos (e não misturar com os antigos em cache)
+APP_VERSAO = '2026-11-23-v11'
+SCRIPTS = ['art', 'data', 'alteracoes', 'catalogo', 'analises', 'supabase-config', 'nuvem', 'auth', 'dados', 'app', 'pages-loja', 'pages-info', 'pages-conta', 'pages-gestao', 'pages-gestao2', 'pages-parceiro', 'textos', 'faturas', 'pages-extra']
 FONTS = 'https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Marcellus&display=swap'
 
 def shell(page, title, root, pid=''):
-    scripts = '\n'.join(f'<script src="{root}js/{s}.js"></script>' for s in SCRIPTS)
+    scripts = '\n'.join(f'<script src="{root}js/{s}.js?v={APP_VERSAO}"></script>' for s in SCRIPTS)
     data_id = f' data-id="{pid}"' if pid else ''
     return f'''<!DOCTYPE html>
 <html lang="pt-PT">
@@ -36,7 +38,7 @@ def shell(page, title, root, pid=''):
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="{FONTS}" rel="stylesheet">
-<link rel="stylesheet" href="{root}css/styles.css">
+<link rel="stylesheet" href="{root}css/styles.css?v={APP_VERSAO}">
 </head>
 <body data-page="{page}"{data_id} data-root="{root}">
 <a class="sr skip" href="#main">Saltar para o conteúdo / Skip to content</a>
@@ -57,6 +59,8 @@ pages = [
     ('colhe-connosco', 'colhe-connosco', 'Colhe Connosco'), ('sobre', 'sobre', 'Sobre nós'),
     ('contacto', 'contacto', 'Contacto'), ('faq', 'faq', 'Perguntas frequentes'), ('politicas', 'politicas', 'Políticas'),
     ('entrar', 'entrar', 'Entrar'), ('conta', 'conta', 'A minha conta'), ('finalizar', 'finalizar', 'Finalizar encomenda'), ('parceiro', 'parceiro', 'Área de parceiro'),
+    ('restaurante', 'restaurante', 'Restaurante'), ('cooperativa', 'cooperativa', 'Cooperativa'),
+    ('termos', 'termos', 'Termos e condições'), ('privacidade', 'privacidade', 'Privacidade'), ('cookies', 'cookies', 'Cookies'), ('devolucoes', 'devolucoes', 'Devoluções'),
 ]
 count = 0
 def write(path, page, title, pid=''):
@@ -91,7 +95,6 @@ for pid in products:
 # app para telemóvel (web app em /app e base da app Android): mesmos scripts do site + os da app
 APP_SCRIPTS = SCRIPTS + ['app-config', 'app-nativo', 'app-movel']
 # muda a cada versão: obriga o navegador a ir buscar os ficheiros novos (e não misturar com os antigos em cache)
-APP_VERSAO = '2026-11-17-v10b'
 # se faltar um ficheiro no site ou houver um erro antes de a app abrir, mostra o motivo em vez de um ecrã vazio
 APP_GUARDA = r'''<script>
 (function () {
